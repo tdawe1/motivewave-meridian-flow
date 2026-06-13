@@ -63,7 +63,7 @@ import java.util.List;
 )
 public class MeridianFlowForge extends Study
 {
-  private static final String VERSION = "v8-projection-filters";
+  private static final String VERSION = "v9-signal-recovery";
   private static volatile boolean loggedCalculate;
   private static final int MAX_OPTIMIZER_CANDIDATES = 560;
 
@@ -554,10 +554,10 @@ public class MeridianFlowForge extends Study
       }
 
       if (i == signalIndex) {
-        if (isBullBos) signal(ctx, i, Signals.BULL_BOS, "Bull BOS above " + formatPrice(brokenHighLvl), brokenHighLvl);
-        if (isBullChoch) signal(ctx, i, Signals.BULL_CHOCH, "Bull CHoCH above " + formatPrice(brokenHighLvl), brokenHighLvl);
-        if (isBearBos) signal(ctx, i, Signals.BEAR_BOS, "Bear BOS below " + formatPrice(brokenLowLvl), brokenLowLvl);
-        if (isBearChoch) signal(ctx, i, Signals.BEAR_CHOCH, "Bear CHoCH below " + formatPrice(brokenLowLvl), brokenLowLvl);
+        if (isBullBos && eventAllowed(cfg.signalMode, true, false)) signal(ctx, i, Signals.BULL_BOS, "Bull BOS above " + formatPrice(brokenHighLvl), brokenHighLvl);
+        if (isBullChoch && eventAllowed(cfg.signalMode, false, true)) signal(ctx, i, Signals.BULL_CHOCH, "Bull CHoCH above " + formatPrice(brokenHighLvl), brokenHighLvl);
+        if (isBearBos && eventAllowed(cfg.signalMode, true, false)) signal(ctx, i, Signals.BEAR_BOS, "Bear BOS below " + formatPrice(brokenLowLvl), brokenLowLvl);
+        if (isBearChoch && eventAllowed(cfg.signalMode, false, true)) signal(ctx, i, Signals.BEAR_CHOCH, "Bear CHoCH below " + formatPrice(brokenLowLvl), brokenLowLvl);
       }
 
       boolean bullObEvent = eventAllowed(cfg.obFrom, isBullBos, isBullChoch);
@@ -957,11 +957,8 @@ public class MeridianFlowForge extends Study
     boolean htfShort = !cfg.useHtf || (htfBias != null && signalIndex < htfBias.bear.length && htfBias.bear[signalIndex]);
     boolean forgeLongNow = forgeLong != null && signalIndex < forgeLong.length && forgeLong[signalIndex];
     boolean forgeShortNow = forgeShort != null && signalIndex < forgeShort.length && forgeShort[signalIndex];
-    boolean forgeLongRising = forgeLongNow && (signalIndex == 0 || !forgeLong[signalIndex - 1]);
-    boolean forgeShortRising = forgeShortNow && (signalIndex == 0 || !forgeShort[signalIndex - 1]);
-    boolean forgeOnly = "Forge only".equals(cfg.signalSource);
-    boolean forgeLongOk = !usesForge || (forgeOnly ? forgeLongRising : forgeLongNow);
-    boolean forgeShortOk = !usesForge || (forgeOnly ? forgeShortRising : forgeShortNow);
+    boolean forgeLongOk = !usesForge || forgeLongNow;
+    boolean forgeShortOk = !usesForge || forgeShortNow;
     boolean structureLongOk = !usesStructure || (!Double.isNaN(lastSwingHigh) && !swingHighBroken &&
       eventAllowed(cfg.signalMode, structTrend >= 0, structTrend < 0));
     boolean structureShortOk = !usesStructure || (!Double.isNaN(lastSwingLow) && !swingLowBroken &&
@@ -1163,6 +1160,7 @@ public class MeridianFlowForge extends Study
     int passes = "Around Current".equals(cfg.optimizerSearch) ? 1 : 2;
     for (int pass = 0; pass < passes && acc.candidates < MAX_OPTIMIZER_CANDIDATES; pass++) {
       SettingsView anchor = acc.best == null ? seed : acc.best.cfg;
+      scanRisk(acc, ctx, s, anchor, signalIndex);
       scanSwing(acc, ctx, s, anchor, signalIndex);
       scanSma(acc, ctx, s, anchor, signalIndex);
       scanRsi(acc, ctx, s, anchor, signalIndex);
@@ -1170,7 +1168,6 @@ public class MeridianFlowForge extends Study
       scanSar(acc, ctx, s, anchor, signalIndex);
       scanTilson(acc, ctx, s, anchor, signalIndex);
       scanSmi(acc, ctx, s, anchor, signalIndex);
-      scanRisk(acc, ctx, s, anchor, signalIndex);
     }
 
     OptimizerResult out = acc.best == null ? acc.fallback : acc.best;
