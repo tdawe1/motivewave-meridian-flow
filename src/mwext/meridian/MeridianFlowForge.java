@@ -50,7 +50,7 @@ import java.util.Arrays;
 import java.util.List;
 
 @StudyHeader(
-  namespace = "tdawe.meridian",
+  namespace = "codex.meridian",
   id = "MERIDIAN_FLOW_FORGE",
   name = "Meridian Flow Forge",
   label = "Meridian Forge",
@@ -63,7 +63,7 @@ import java.util.List;
 )
 public class MeridianFlowForge extends Study
 {
-  private static final String VERSION = "v9-signal-recovery";
+  private static final String VERSION = "v10-workspace-compat";
   private static volatile boolean loggedCalculate;
   private static final int MAX_OPTIMIZER_CANDIDATES = 560;
 
