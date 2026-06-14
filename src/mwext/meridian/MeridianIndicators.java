@@ -32,7 +32,7 @@ final class MeridianIndicators {
     return sma(v, len);
   }
 
-  private static double[] emaWithNa(double[] v, int len, double k) {
+  static double[] emaWithNa(double[] v, int len, double k) {
     double[] out = fillNa(v.length);
     double sum = 0.0;
     int valid = 0;
@@ -194,13 +194,13 @@ final class MeridianIndicators {
         gain += g; loss += l;
         if (i == len) {
           gain /= len; loss /= len;
-          out[i] = loss == 0 ? 100 : 100 - 100 / (1 + gain / loss);
+          out[i] = loss == 0 ? (gain == 0 ? 50 : 100) : 100 - 100 / (1 + gain / loss);
         }
       }
       else {
         gain = (gain * (len - 1) + g) / len;
         loss = (loss * (len - 1) + l) / len;
-        out[i] = loss == 0 ? 100 : 100 - 100 / (1 + gain / loss);
+        out[i] = loss == 0 ? (gain == 0 ? 50 : 100) : 100 - 100 / (1 + gain / loss);
       }
     }
     return out;
@@ -213,7 +213,7 @@ final class MeridianIndicators {
     for (int i = 0; i < line.length; i++) {
       if (!Double.isNaN(ef[i]) && !Double.isNaN(es[i])) line[i] = ef[i] - es[i];
     }
-    return new Macd(line, ema(line, sig));
+    return new Macd(line, emaWithNa(line, sig, 2.0 / (sig + 1.0)));
   }
 
   static Stoch stoch(DataSeries s, int kLen, int dLen, int smooth) {
@@ -279,7 +279,7 @@ final class MeridianIndicators {
       double sum = pdi[i] + mdi[i];
       dx[i] = sum == 0 ? 0 : 100 * Math.abs(pdi[i] - mdi[i]) / sum;
     }
-    return new Adx(pdi, mdi, rma(dx, adxLen));
+    return new Adx(pdi, mdi, rmaNa(dx, adxLen));
   }
 
   static Sar sar(DataSeries s, double start, double inc, double max) {
@@ -361,6 +361,29 @@ final class MeridianIndicators {
       if (i < len) {
         sum += val;
         if (i == len - 1) out[i] = sum / len;
+      }
+      else {
+        out[i] = (out[i - 1] * (len - 1) + val) / len;
+      }
+    }
+    return out;
+  }
+
+  static double[] rmaNa(double[] v, int len) {
+    double[] out = fillNa(v.length);
+    double sum = 0.0;
+    int valid = 0;
+    boolean ready = false;
+    for (int i = 0; i < v.length; i++) {
+      double val = v[i];
+      if (Double.isNaN(val) || Double.isInfinite(val)) {
+        if (ready) out[i] = out[i - 1];
+        continue;
+      }
+      if (!ready) {
+        sum += val;
+        valid++;
+        if (valid == len) { out[i] = sum / len; ready = true; }
       }
       else {
         out[i] = (out[i - 1] * (len - 1) + val) / len;

@@ -498,6 +498,7 @@ public class MeridianFlowForge extends Study
 
     double atrTrendLine = Double.NaN;
     double prevAtrTrendLine = Double.NaN;
+    PathInfo structPath = getSettings().getPath(STRUCT_PATH);
 
     for (int i = 0; i < n; i++) {
       boolean confirmed = s.isBarComplete(i);
@@ -559,14 +560,18 @@ public class MeridianFlowForge extends Study
       }
 
       if (cfg.showBos && (isBullBos || isBullChoch) && brokenHighBar >= 0) {
-        addLimited(structLineEvents, MAX_STRUCT_LINES,
-          FigureEvent.line(brokenHighBar, brokenHighLvl, i, brokenHighLvl, cfg.bullColor, dotted(2.0f)));
+        if (structPath == null || structPath.isEnabled()) {
+          addLimited(structLineEvents, MAX_STRUCT_LINES,
+            FigureEvent.line(brokenHighBar, brokenHighLvl, i, brokenHighLvl, structColor(structPath), structStroke(structPath)));
+        }
         addLimited(structLabelEvents, MAX_STRUCT_LABELS,
           FigureEvent.label(i, brokenHighLvl, isBullChoch ? "CHoCH UP" : "BOS UP", cfg.bullColor, Enums$Position.TOP));
       }
       if (cfg.showBos && (isBearBos || isBearChoch) && brokenLowBar >= 0) {
-        addLimited(structLineEvents, MAX_STRUCT_LINES,
-          FigureEvent.line(brokenLowBar, brokenLowLvl, i, brokenLowLvl, cfg.bearColor, dotted(2.0f)));
+        if (structPath == null || structPath.isEnabled()) {
+          addLimited(structLineEvents, MAX_STRUCT_LINES,
+            FigureEvent.line(brokenLowBar, brokenLowLvl, i, brokenLowLvl, structColor(structPath), structStroke(structPath)));
+        }
         addLimited(structLabelEvents, MAX_STRUCT_LABELS,
           FigureEvent.label(i, brokenLowLvl, isBearChoch ? "CHoCH DOWN" : "BOS DOWN", cfg.bearColor, Enums$Position.BOTTOM));
       }
@@ -610,6 +615,13 @@ public class MeridianFlowForge extends Study
       openLongSignals[i] = openLongSignal;
       openShortSignals[i] = openShortSignal;
 
+      // Suppress conflicting long/short signals: store neither on a tie.
+      if (openLongSignal && openShortSignal) {
+        openLongSignal = openShortSignal = false;
+        openLongSignals[i] = false;
+        openShortSignals[i] = false;
+      }
+
 
       double riskAtr = nz(atrRisk[i]);
       double slDistance = riskAtr * cfg.slMultEff;
@@ -631,11 +643,17 @@ public class MeridianFlowForge extends Study
         lastTrade = snapshot(activeDir, i, i + LINE_FORWARD_BARS, activeEntry, activeSL, activeTP1, activeTP2, activeTP3,
           tp1Reached, tp2Reached, tp3Reached, beActive);
         MarkerInfo markerInfo = getSettings().getMarker(openLong ? UP_MARKER : DOWN_MARKER);
-        if (markerInfo == null) markerInfo = new MarkerInfo(Enums$MarkerType.TRIANGLE, Enums$Size.SMALL,
-          openLong ? cfg.bullColor : cfg.bearColor, Color.BLACK, true);
-        Marker marker = new Marker(new Coordinate(s.getStartTime(i), openLong ? s.getLow(i) : s.getHigh(i)),
-          openLong ? Enums$Position.BOTTOM : Enums$Position.TOP, markerInfo, openLong ? "Long" : "Short");
-        addFigure(marker);
+        if (markerInfo == null) {
+          MarkerInfo fallback = new MarkerInfo(Enums$MarkerType.TRIANGLE, Enums$Size.SMALL,
+            openLong ? cfg.bullColor : cfg.bearColor, Color.BLACK, true);
+          Marker marker = new Marker(new Coordinate(s.getStartTime(i), openLong ? s.getLow(i) : s.getHigh(i)),
+            openLong ? Enums$Position.BOTTOM : Enums$Position.TOP, fallback, openLong ? "Long" : "Short");
+          addFigure(marker);
+        } else if (markerInfo.isEnabled()) {
+          Marker marker = new Marker(new Coordinate(s.getStartTime(i), openLong ? s.getLow(i) : s.getHigh(i)),
+            openLong ? Enums$Position.BOTTOM : Enums$Position.TOP, markerInfo, openLong ? "Long" : "Short");
+          addFigure(marker);
+        }
         if (i == signalIndex) {
           String msg = (openLong ? "LONG" : "SHORT") + " confirmed | Entry " + formatPrice(activeEntry)
             + " | SL " + formatPrice(activeSL) + targetMessage(cfg, activeTP1, activeTP2, activeTP3);
@@ -757,6 +775,7 @@ public class MeridianFlowForge extends Study
     double rsiLong, rsiShort, stFactor, bbMult, sarStart, sarInc, sarMax, cciLong, cciShort, adxThreshold;
     double smiTopGuide, smiBottomGuide;
     double slMultEff, tpEff, tp1Eff, tp2Eff, tp3Eff, atrTrendMult;
+    double slMultRaw, tpMultRaw, tp1MultRaw, tp2MultRaw, tp3MultRaw;
     boolean breakOnWick, showStruct, showBos, showOB, obMitWick, removeMitigated, obMean, obLabels;
     boolean useHtf, requireAll, enableSma, enableRsi, enableMacd, enableSt, enableStoch, enableBb, enableEma;
     boolean enableAo, enableSar, enableCci, enableAdx, enableTilson, enableSmi, showRisk, useBreakEven, showAtrTrend, showDashboard, showOptimizer, showProjection, dashboardCompact, dashboardHideUnused, singleTarget, alertSl, alertTp, alertOb;
@@ -837,11 +856,11 @@ public class MeridianFlowForge extends Study
       smiBottomGuide = st.getDouble(SMI_BOTTOM_GUIDE, -0.1);
       smiMode = st.getString(SMI_MODE, "Line vs Signal");
       atrRiskLen = st.getInteger(ATR_RISK_LEN, 13);
-      double sl = st.getDouble(SL_MULT, 1.5);
-      double tp = st.getDouble(TP_MULT, 2.0);
-      double tp1 = st.getDouble(TP1_MULT, 1.0);
-      double tp2 = st.getDouble(TP2_MULT, 2.0);
-      double tp3 = st.getDouble(TP3_MULT, 3.0);
+      slMultRaw = st.getDouble(SL_MULT, 1.5);
+      tpMultRaw = st.getDouble(TP_MULT, 2.0);
+      tp1MultRaw = st.getDouble(TP1_MULT, 1.0);
+      tp2MultRaw = st.getDouble(TP2_MULT, 2.0);
+      tp3MultRaw = st.getDouble(TP3_MULT, 3.0);
       riskPreset = st.getString(RISK_PRESET, "Balanced");
       tpMode = st.getString(TP_MODE, "Three Targets");
       singleTarget = "Single Target".equals(tpMode);
@@ -850,8 +869,12 @@ public class MeridianFlowForge extends Study
         case "Conservative" -> { slMultEff = 2.5; tpEff = 2.0; tp1Eff = 1.0; tp2Eff = 2.0; tp3Eff = 4.0; }
         case "Aggressive" -> { slMultEff = 1.0; tpEff = 2.5; tp1Eff = 1.5; tp2Eff = 2.5; tp3Eff = 4.0; }
         case "Scalping" -> { slMultEff = 0.8; tpEff = 1.5; tp1Eff = 0.8; tp2Eff = 1.5; tp3Eff = 2.0; }
-        case "Custom" -> { slMultEff = sl; tpEff = tp; tp1Eff = tp1; tp2Eff = tp2; tp3Eff = tp3; }
+        case "Custom" -> { slMultEff = slMultRaw; tpEff = tpMultRaw; tp1Eff = tp1MultRaw; tp2Eff = tp2MultRaw; tp3Eff = tp3MultRaw; }
         default -> { slMultEff = 1.5; tpEff = 2.0; tp1Eff = 1.0; tp2Eff = 2.0; tp3Eff = 3.0; }
+      }
+      if (!singleTarget) {
+        if (tp1Eff >= tp2Eff) tp2Eff = tp1Eff + 0.5;
+        if (tp2Eff >= tp3Eff) tp3Eff = tp2Eff + 0.5;
       }
       showRisk = st.getBoolean(SHOW_RISK, true);
       useBreakEven = st.getBoolean(USE_BE, true);
@@ -893,6 +916,7 @@ public class MeridianFlowForge extends Study
       c.rsiLong = rsiLong; c.rsiShort = rsiShort; c.stFactor = stFactor; c.bbMult = bbMult; c.sarStart = sarStart; c.sarInc = sarInc; c.sarMax = sarMax; c.cciLong = cciLong; c.cciShort = cciShort; c.adxThreshold = adxThreshold;
       c.smiTopGuide = smiTopGuide; c.smiBottomGuide = smiBottomGuide;
       c.slMultEff = slMultEff; c.tpEff = tpEff; c.tp1Eff = tp1Eff; c.tp2Eff = tp2Eff; c.tp3Eff = tp3Eff; c.atrTrendMult = atrTrendMult;
+      c.slMultRaw = slMultRaw; c.tpMultRaw = tpMultRaw; c.tp1MultRaw = tp1MultRaw; c.tp2MultRaw = tp2MultRaw; c.tp3MultRaw = tp3MultRaw;
       c.breakOnWick = breakOnWick; c.showStruct = showStruct; c.showBos = showBos; c.showOB = showOB; c.obMitWick = obMitWick; c.removeMitigated = removeMitigated; c.obMean = obMean; c.obLabels = obLabels;
       c.useHtf = useHtf; c.requireAll = requireAll; c.enableSma = enableSma; c.enableRsi = enableRsi; c.enableMacd = enableMacd; c.enableSt = enableSt; c.enableStoch = enableStoch; c.enableBb = enableBb; c.enableEma = enableEma;
       c.enableAo = enableAo; c.enableSar = enableSar; c.enableCci = enableCci; c.enableAdx = enableAdx; c.enableTilson = enableTilson; c.enableSmi = enableSmi; c.showRisk = showRisk; c.useBreakEven = useBreakEven; c.showAtrTrend = showAtrTrend; c.showDashboard = showDashboard; c.showOptimizer = showOptimizer; c.showProjection = showProjection; c.dashboardCompact = dashboardCompact; c.dashboardHideUnused = dashboardHideUnused; c.singleTarget = singleTarget;
@@ -956,18 +980,23 @@ public class MeridianFlowForge extends Study
   }
 
   private void drawTradeLines(DataSeries s, TradeLines t, SettingsView cfg) {
+    PathInfo riskPath = getSettings().getPath(RISK_PATH);
+    if (riskPath != null && !riskPath.isEnabled()) return;
     int x1 = t.entryIndex;
     int x2 = Math.max(x1 + 1, t.endIndex);
     long t1 = timeAtOrProjected(s, x1);
     long t2 = timeAtOrProjected(s, x2);
-    Color entry = new Color(80, 140, 180);
+    Color entry = riskColor(riskPath);
     Color sl = t.beActive ? new Color(255, 167, 38) : new Color(229, 83, 83);
     Color tp = new Color(76, 175, 80);
-    addLevel(t1, t2, t.entry, "ENTRY " + formatPrice(t.entry), entry, dotted(1.0f));
-    addLevel(t1, t2, t.sl, (t.beActive ? "BE " : "SL ") + formatPrice(t.sl), sl, solid(2.0f));
-    addLevel(t1, t2, t.tp1, (t.tp1Hit ? (cfg.singleTarget ? "TP HIT " : "TP1 HIT ") : (cfg.singleTarget ? "TP " : "TP1 ")) + formatPrice(t.tp1), t.tp1Hit ? new Color(77, 182, 172) : tp, dashed(1.0f));
-    if (!cfg.singleTarget) addLevel(t1, t2, t.tp2, (t.tp2Hit ? "TP2 HIT " : "TP2 ") + formatPrice(t.tp2), t.tp2Hit ? new Color(77, 182, 172) : tp, dashed(1.0f));
-    if (!cfg.singleTarget) addLevel(t1, t2, t.tp3, (t.tp3Hit ? "TP3 HIT " : "TP3 ") + formatPrice(t.tp3), t.tp3Hit ? new Color(77, 182, 172) : tp, dashed(1.0f));
+    BasicStroke entryStroke = riskStroke(riskPath);
+    BasicStroke slStroke = solid(riskWidth(riskPath) * 2.0f);
+    BasicStroke tpStroke = dashed(riskWidth(riskPath));
+    addLevel(t1, t2, t.entry, "ENTRY " + formatPrice(t.entry), entry, entryStroke);
+    addLevel(t1, t2, t.sl, (t.beActive ? "BE " : "SL ") + formatPrice(t.sl), sl, slStroke);
+    addLevel(t1, t2, t.tp1, (t.tp1Hit ? (cfg.singleTarget ? "TP HIT " : "TP1 HIT ") : (cfg.singleTarget ? "TP " : "TP1 ")) + formatPrice(t.tp1), t.tp1Hit ? new Color(77, 182, 172) : tp, tpStroke);
+    if (!cfg.singleTarget) addLevel(t1, t2, t.tp2, (t.tp2Hit ? "TP2 HIT " : "TP2 ") + formatPrice(t.tp2), t.tp2Hit ? new Color(77, 182, 172) : tp, tpStroke);
+    if (!cfg.singleTarget) addLevel(t1, t2, t.tp3, (t.tp3Hit ? "TP3 HIT " : "TP3 ") + formatPrice(t.tp3), t.tp3Hit ? new Color(77, 182, 172) : tp, tpStroke);
   }
 
   private static Projection buildProjection(DataSeries s, SettingsView cfg, int signalIndex, int activeDir,
@@ -1210,11 +1239,13 @@ public class MeridianFlowForge extends Study
     st.setString(RISK_PRESET, c.riskPreset);
     st.setString(TP_MODE, c.tpMode);
     st.setInteger(ATR_RISK_LEN, c.atrRiskLen);
-    st.setDouble(SL_MULT, c.slMultEff);
-    st.setDouble(TP_MULT, c.tpEff);
-    st.setDouble(TP1_MULT, c.tp1Eff);
-    st.setDouble(TP2_MULT, c.tp2Eff);
-    st.setDouble(TP3_MULT, c.tp3Eff);
+    if ("Custom".equals(c.riskPreset)) {
+      st.setDouble(SL_MULT, c.slMultEff);
+      st.setDouble(TP_MULT, c.tpEff);
+      st.setDouble(TP1_MULT, c.tp1Eff);
+      st.setDouble(TP2_MULT, c.tp2Eff);
+      st.setDouble(TP3_MULT, c.tp3Eff);
+    }
     st.setBoolean(USE_BE, c.useBreakEven);
     st.setBoolean(REQUIRE_ALL, c.requireAll);
     st.setBoolean(ENABLE_SMA, c.enableSma);
@@ -1568,6 +1599,12 @@ public class MeridianFlowForge extends Study
         case "Forge only" -> forgeShortRising && htfBearOk;
         default -> bearEvent && htfBearOk && forgeShort;
       };
+
+      // Suppress conflicting long/short signals: store neither on a tie.
+      if (longs[i] && shorts[i]) {
+        longs[i] = false;
+        shorts[i] = false;
+      }
       prevForgeLong = forgeLong;
       prevForgeShort = forgeShort;
     }
@@ -1616,7 +1653,7 @@ public class MeridianFlowForge extends Study
   private static double boundedRatio(double value, double cap) {
     if (Double.isInfinite(value)) return cap;
     if (Double.isNaN(value)) return 0.0;
-    return Math.max(-cap, Math.min(cap, value));
+    return Math.clamp(value, -cap, cap);
   }
 
   private static int[] uniqueInts(int[] values, int min, int max) {
@@ -1701,12 +1738,12 @@ public class MeridianFlowForge extends Study
     b.append('|').append(cfg.enableTilson).append('|').append(cfg.tilsonInput).append('|').append(cfg.tilsonMethod).append('|').append(cfg.tilsonPeriod);
     b.append('|').append(cfg.enableSmi).append('|').append(cfg.smiInput).append('|').append(cfg.smiMethod).append('|').append(cfg.smiLongPeriod).append('|').append(cfg.smiShortPeriod).append('|').append(cfg.smiSignalPeriod)
       .append('|').append(cfg.smiTopGuide).append('|').append(cfg.smiBottomGuide).append('|').append(cfg.smiMode);
-    b.append('|').append(cfg.atrRiskLen).append('|').append(cfg.slMultEff).append('|').append(cfg.tpEff).append('|').append(cfg.tp1Eff).append('|').append(cfg.tp2Eff).append('|').append(cfg.tp3Eff).append('|').append(cfg.tpMode).append('|').append(cfg.singleTarget).append('|').append(cfg.useBreakEven);
+    b.append('|').append(cfg.atrRiskLen).append('|').append(cfg.slMultEff).append('|').append(cfg.tpEff).append('|').append(cfg.tp1Eff).append('|').append(cfg.tp2Eff).append('|').append(cfg.tp3Eff).append('|').append(cfg.riskPreset).append('|').append(cfg.tpMode).append('|').append(cfg.singleTarget).append('|').append(cfg.useBreakEven);
     return b.toString();
   }
 
-  private static String calculationKey(DataSeries s, SettingsView cfg, int signalIndex) {
-    StringBuilder b = new StringBuilder(640);
+  private String calculationKey(DataSeries s, SettingsView cfg, int signalIndex) {
+    StringBuilder b = new StringBuilder(768);
     b.append(optimizerKey(s, cfg, signalIndex));
     b.append('|').append(s.size() == 0 ? 0L : s.getStartTime(0));
     b.append('|').append(cfg.showStruct).append('|').append(cfg.showBos).append('|').append(cfg.showOB)
@@ -1720,6 +1757,8 @@ public class MeridianFlowForge extends Study
       .append('|').append(cfg.showOptimizer).append('|').append(cfg.alertSl).append('|').append(cfg.alertTp).append('|').append(cfg.alertOb);
     b.append('|').append(rgb(cfg.bullColor)).append('|').append(rgb(cfg.bearColor))
       .append('|').append(rgb(cfg.obBullColor)).append('|').append(rgb(cfg.obBearColor)).append('|').append(rgb(cfg.neutralColor));
+    b.append('|').append(markerSig(UP_MARKER)).append('|').append(markerSig(DOWN_MARKER));
+    b.append('|').append(pathSig(STRUCT_PATH)).append('|').append(pathSig(RISK_PATH));
     return b.toString();
   }
 
@@ -1970,9 +2009,9 @@ public class MeridianFlowForge extends Study
       int hi = htf.findIndex(base.getStartTime(i));
       if (hi > 0) hi -= 1;
       if (hi < 0 || hi >= htfEma.length || Double.isNaN(htfEma[hi])) continue;
-      double close = base.getClose(i);
-      bull[i] = close >= htfEma[hi];
-      bear[i] = close <= htfEma[hi];
+      double htfClose = htf.getClose(hi);
+      bull[i] = htfClose >= htfEma[hi];
+      bear[i] = htfClose <= htfEma[hi];
     }
     return new HtfBias(bull, bear);
   }
@@ -2014,6 +2053,52 @@ public class MeridianFlowForge extends Study
 
   private static BasicStroke dotted(float width) {
     return new BasicStroke(width, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10.0f, new float[] {1f, 5f}, 0.0f);
+  }
+
+  private static Color structColor(PathInfo p) {
+    Color c = p == null ? null : p.getColor();
+    return c == null ? new Color(128, 128, 128) : c;
+  }
+
+  private static BasicStroke structStroke(PathInfo p) {
+    if (p == null) return new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 10.0f, new float[] {3f, 3f}, 0.0f);
+    float width = p.getStrokeWidth();
+    float[] dash = p.getDash();
+    return dash == null ? new BasicStroke(width) : new BasicStroke(width, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 10.0f, dash, 0.0f);
+  }
+
+  private static Color riskColor(PathInfo p) {
+    Color c = p == null ? null : p.getColor();
+    return c == null ? new Color(80, 140, 180) : c;
+  }
+
+  private static BasicStroke riskStroke(PathInfo p) {
+    if (p == null) return dotted(1.0f);
+    float width = p.getStrokeWidth();
+    float[] dash = p.getDash();
+    return dash == null ? new BasicStroke(width) : new BasicStroke(width, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 10.0f, dash, 0.0f);
+  }
+
+  private static float riskWidth(PathInfo p) {
+    return p == null ? 1.0f : p.getStrokeWidth();
+  }
+
+  private String markerSig(String id) {
+    MarkerInfo m = getSettings().getMarker(id);
+    return m == null ? "null" : m.getKey() + ":" + m.isEnabled();
+  }
+
+  private String pathSig(String id) {
+    PathInfo p = getSettings().getPath(id);
+    if (p == null) return "null";
+    return p.getKey() + ":" + p.isEnabled() + ":" + rgb(p.getColor()) + ":" + p.getStrokeWidth() + ":" + dashSig(p.getDash());
+  }
+
+  private static String dashSig(float[] dash) {
+    if (dash == null) return "S";
+    StringBuilder sb = new StringBuilder();
+    for (float f : dash) sb.append((int) (f * 100));
+    return sb.toString();
   }
 
 }

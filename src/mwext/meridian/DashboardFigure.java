@@ -68,24 +68,25 @@ final class DashboardFigure extends Figure {
     int w = (int)Math.round(b.getWidth());
     int h = (int)Math.round(b.getHeight());
 
-    Object oldAa = gc.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
-    Stroke oldStroke = gc.getStroke();
-    gc.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-    gc.setColor(BACKGROUND);
-    gc.fillRoundRect(x, y, w, h, 12, 12);
-    gc.setColor(BORDER);
-    gc.setStroke(BORDER_STROKE);
-    gc.drawRoundRect(x, y, w, h, 12, 12);
-    gc.setStroke(oldStroke);
+    Graphics2D g = (Graphics2D) gc.create();
+    try {
+      g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+      g.setColor(BACKGROUND);
+      g.fillRoundRect(x, y, w, h, 12, 12);
+      g.setColor(BORDER);
+      g.setStroke(BORDER_STROKE);
+      g.drawRoundRect(x, y, w, h, 12, 12);
 
-    int rowY = y + PAD_Y;
-    for (int i = 0; i < count; i++) {
-      DashboardRow row = rows[i];
-      if (row == null) continue;
-      drawRow(gc, row, x + PAD_X, rowY, w - PAD_X * 2, compact);
-      rowY += ROW_H;
+      int rowY = y + PAD_Y;
+      for (int i = 0; i < count; i++) {
+        DashboardRow row = rows[i];
+        if (row == null) continue;
+        drawRow(g, row, x + PAD_X, rowY, w - PAD_X * 2, compact);
+        rowY += ROW_H;
+      }
+    } finally {
+      g.dispose();
     }
-    gc.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAa);
   }
 
   private static void drawRow(Graphics2D gc, DashboardRow row, int x, int y, int width, boolean compact) {
