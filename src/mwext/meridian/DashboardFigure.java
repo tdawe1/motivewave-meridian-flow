@@ -121,8 +121,13 @@ final class DashboardFigure extends Figure {
     if (text == null) return "";
     if (maxWidth <= 0 || fm.stringWidth(text) <= maxWidth) return text;
     if (maxWidth <= fm.stringWidth("…")) return "";
-    int end = text.length();
-    while (end > 0 && fm.stringWidth(text.substring(0, end) + "…") > maxWidth) end--;
-    return end <= 0 ? "" : text.substring(0, end) + "…";
+    int lo = 0;
+    int hi = text.length();
+    while (lo < hi) {
+      int mid = (lo + hi + 1) >>> 1;
+      if (fm.stringWidth(text.substring(0, mid) + "…") <= maxWidth) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo <= 0 ? "" : text.substring(0, lo) + "…";
   }
 }

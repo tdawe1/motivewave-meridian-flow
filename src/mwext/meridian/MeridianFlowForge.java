@@ -423,7 +423,7 @@ public class MeridianFlowForge extends Study
     int signalIndex = latestCompleteIndex(s);
     if (getSettings().getBoolean(APPLY_OPTIMIZER, false)) {
       OptimizerResult applied = applyOptimizerRecommendation(ctx, s, cfg, signalIndex);
-      if (applied != null && applied.cfg != null) cfg = applied.cfg;
+      if (applied != null && applied.valid && applied.cfg != null) cfg = applied.cfg;
     }
     String calcKey = calculationKey(s, cfg, signalIndex);
     if (calcKey.equals(calculationCacheKey)) return;
@@ -431,36 +431,39 @@ public class MeridianFlowForge extends Study
     beginFigureUpdate();
     clearFigures();
 
+    boolean needsForge = !"Structure only".equals(cfg.signalSource);
+    boolean needsDashboardFilters = cfg.showDashboard && !cfg.dashboardCompact;
     double[] closes = closeArray(s);
-    double[] smaFast = sma(closes, cfg.smaFast);
-    double[] smaSlow = sma(closes, cfg.smaSlow);
-    double[] emaFast = ema(closes, cfg.emaFast);
-    double[] emaSlow = ema(closes, cfg.emaSlow);
-    double[] rsi = rsi(s, cfg.rsiLen);
-    Macd macd = macd(s, cfg.macdFast, cfg.macdSlow, cfg.macdSignal);
-    Stoch stoch = stoch(s, cfg.stochK, cfg.stochD, cfg.stochSmooth);
-    double[] bbMid = sma(closes, cfg.bbLen);
-    double[] ao = ao(s);
-    double[] cci = cci(s, cfg.cciLen);
-    Adx adx = adx(s, cfg.diLen, cfg.adxLen);
-    Sar sar = sar(s, cfg.sarStart, cfg.sarInc, cfg.sarMax);
-    Tilson tilson = cfg.enableTilson ? tilson(s, cfg.tilsonInput, cfg.tilsonMethod, cfg.tilsonPeriod) : null;
-    Smi smi = cfg.enableSmi ? smi(s, cfg.smiInput, cfg.smiMethod, cfg.smiLongPeriod, cfg.smiShortPeriod, cfg.smiSignalPeriod) : null;
-    Super superTrend = superTrend(s, cfg.stLen, cfg.stFactor);
+    double[] smaFast = needsForge && cfg.enableSma ? sma(closes, cfg.smaFast) : null;
+    double[] smaSlow = needsForge && cfg.enableSma ? sma(closes, cfg.smaSlow) : null;
+    double[] emaFast = needsForge && cfg.enableEma ? ema(closes, cfg.emaFast) : null;
+    double[] emaSlow = needsForge && cfg.enableEma ? ema(closes, cfg.emaSlow) : null;
+    double[] rsi = (needsForge || needsDashboardFilters) && cfg.enableRsi ? rsi(s, cfg.rsiLen) : null;
+    Macd macd = needsForge && cfg.enableMacd ? macd(s, cfg.macdFast, cfg.macdSlow, cfg.macdSignal) : null;
+    Stoch stoch = (needsForge || needsDashboardFilters) && cfg.enableStoch ? stoch(s, cfg.stochK, cfg.stochD, cfg.stochSmooth) : null;
+    Bands bb = needsForge && cfg.enableBb ? bollinger(closes, cfg.bbLen, cfg.bbMult) : null;
+    double[] ao = needsForge && cfg.enableAo ? ao(s) : null;
+    double[] cci = needsForge && cfg.enableCci ? cci(s, cfg.cciLen) : null;
+    Adx adx = needsForge && cfg.enableAdx ? adx(s, cfg.diLen, cfg.adxLen) : null;
+    Sar sar = (needsForge || needsDashboardFilters) && cfg.enableSar ? sar(s, cfg.sarStart, cfg.sarInc, cfg.sarMax) : null;
+    Tilson tilson = (needsForge || needsDashboardFilters) && cfg.enableTilson ? tilson(s, cfg.tilsonInput, cfg.tilsonMethod, cfg.tilsonPeriod) : null;
+    Smi smi = (needsForge || needsDashboardFilters) && cfg.enableSmi ? smi(s, cfg.smiInput, cfg.smiMethod, cfg.smiLongPeriod, cfg.smiShortPeriod, cfg.smiSignalPeriod) : null;
+    Super superTrend = needsForge && cfg.enableSt ? superTrend(s, cfg.stLen, cfg.stFactor) : null;
     double[] atrRisk = atr(s, cfg.atrRiskLen);
-    double[] atrTrendRaw = atr(s, cfg.atrTrendLen);
-    double[] atrTrendSmooth = ema(atrTrendRaw, cfg.atrSmooth);
+    double[] atrTrendSmooth = cfg.showAtrTrend ? ema(atr(s, cfg.atrTrendLen), cfg.atrSmooth) : null;
 
     boolean[] forgeLong = new boolean[n];
     boolean[] openLongSignals = new boolean[n];
     boolean[] openShortSignals = new boolean[n];
 
     boolean[] forgeShort = new boolean[n];
-    for (int i = 0; i < n; i++) {
-      ForgeState state = forgeState(cfg, i, smaFast, smaSlow, emaFast, emaSlow, rsi, macd,
-        stoch, bbMid, closes, ao, sar, cci, adx, superTrend, tilson, smi);
-      forgeLong[i] = state.longOk;
-      forgeShort[i] = state.shortOk;
+    if (needsForge) {
+      for (int i = 0; i < n; i++) {
+        ForgeState state = forgeState(cfg, i, smaFast, smaSlow, emaFast, emaSlow, rsi, macd,
+          stoch, bb, closes, ao, sar, cci, adx, superTrend, tilson, smi);
+        forgeLong[i] = state.longOk;
+        forgeShort[i] = state.shortOk;
+      }
     }
 
     HtfBias htfBias = buildHtfBias(cfg, ctx, s, n);
@@ -499,7 +502,7 @@ public class MeridianFlowForge extends Study
     for (int i = 0; i < n; i++) {
       boolean confirmed = s.isBarComplete(i);
       int pivotBar = i - cfg.swingLen;
-      if (pivotBar >= cfg.swingLen && pivotBar + cfg.swingLen < n) {
+      if (pivotBar >= cfg.swingLen && pivotBar + cfg.swingLen <= signalIndex) {
         if (isPivotHigh(s, pivotBar, cfg.swingLen)) {
           prevSwingHigh = lastSwingHigh;
           lastSwingHigh = s.getHigh(pivotBar);
@@ -646,9 +649,9 @@ public class MeridianFlowForge extends Study
       boolean tp2Hit = canCheckHit && !Double.isNaN(activeTP2) && (activeDir == 1 ? s.getHigh(i) >= activeTP2 : s.getLow(i) <= activeTP2);
       boolean tp3Hit = canCheckHit && !Double.isNaN(activeTP3) && (activeDir == 1 ? s.getHigh(i) >= activeTP3 : s.getLow(i) <= activeTP3);
 
-      boolean tp1First = tp1Hit && !tp1Reached && !slHit;
-      boolean tp2First = tp2Hit && !tp2Reached && !slHit;
-      boolean tp3First = tp3Hit && !tp3Reached && !slHit;
+      boolean tp1First = targetHitBeforeStop(slHit, tp1Hit) && !tp1Reached;
+      boolean tp2First = targetHitBeforeStop(slHit, tp2Hit) && !tp2Reached;
+      boolean tp3First = targetHitBeforeStop(slHit, tp3Hit) && !tp3Reached;
       if (tp1First) tp1Reached = true;
       if (tp2First) tp2Reached = true;
       if (tp3First) tp3Reached = true;
@@ -693,33 +696,38 @@ public class MeridianFlowForge extends Study
         beActive = false;
       }
 
-      double atrTl = nz(atrTrendSmooth[i]);
-      double src = (s.getHigh(i) + s.getLow(i)) / 2.0;
-      double longBand = src - cfg.atrTrendMult * atrTl;
-      double shortBand = src + cfg.atrTrendMult * atrTl;
-      boolean atrFlip = structTrend != prevStructTrend && structTrend != 0;
-      if (cfg.showAtrTrend && structTrend == 1) {
-        atrTrendLine = atrFlip || Double.isNaN(prevAtrTrendLine) ? longBand : Math.max(prevAtrTrendLine, longBand);
-      }
-      else if (cfg.showAtrTrend && structTrend == -1) {
-        atrTrendLine = atrFlip || Double.isNaN(prevAtrTrendLine) ? shortBand : Math.min(prevAtrTrendLine, shortBand);
-      }
-      else {
-        atrTrendLine = Double.NaN;
-      }
-      if (cfg.showAtrTrend && !atrFlip && !Double.isNaN(atrTrendLine)) {
-        s.setDouble(i, Values.ATR_TREND, atrTrendLine);
-        s.setPathColor(i, Values.ATR_TREND, structTrend == 1 ? cfg.bullColor : cfg.bearColor);
+      if (cfg.showAtrTrend) {
+        double atrTl = nz(atrTrendSmooth[i]);
+        double src = (s.getHigh(i) + s.getLow(i)) / 2.0;
+        double longBand = src - cfg.atrTrendMult * atrTl;
+        double shortBand = src + cfg.atrTrendMult * atrTl;
+        boolean atrFlip = structTrend != prevStructTrend && structTrend != 0;
+        if (structTrend == 1) {
+          atrTrendLine = atrFlip || Double.isNaN(prevAtrTrendLine) ? longBand : Math.max(prevAtrTrendLine, longBand);
+        }
+        else if (structTrend == -1) {
+          atrTrendLine = atrFlip || Double.isNaN(prevAtrTrendLine) ? shortBand : Math.min(prevAtrTrendLine, shortBand);
+        }
+        else {
+          atrTrendLine = Double.NaN;
+        }
+        if (!atrFlip && !Double.isNaN(atrTrendLine)) {
+          s.setDouble(i, Values.ATR_TREND, atrTrendLine);
+          s.setPathColor(i, Values.ATR_TREND, structTrend == 1 ? cfg.bullColor : cfg.bearColor);
+        }
+        else {
+          s.setDouble(i, Values.ATR_TREND, null);
+        }
+        if (atrFlip && !Double.isNaN(atrTrendLine)) {
+          Marker flip = new Marker(new Coordinate(s.getStartTime(i), atrTrendLine), Enums$MarkerType.CIRCLE,
+            Enums$Size.VERY_SMALL, Enums$Position.CENTER, structTrend == 1 ? cfg.bullColor : cfg.bearColor, Color.BLACK);
+          addFigure(flip);
+        }
+        prevAtrTrendLine = atrTrendLine;
       }
       else {
         s.setDouble(i, Values.ATR_TREND, null);
       }
-      if (atrFlip && cfg.showAtrTrend && !Double.isNaN(atrTrendLine)) {
-        Marker flip = new Marker(new Coordinate(s.getStartTime(i), atrTrendLine), Enums$MarkerType.CIRCLE,
-          Enums$Size.VERY_SMALL, Enums$Position.CENTER, structTrend == 1 ? cfg.bullColor : cfg.bearColor, Color.BLACK);
-        addFigure(flip);
-      }
-      prevAtrTrendLine = atrTrendLine;
       prevStructTrend = structTrend;
       s.setComplete(i);
     }
@@ -1123,6 +1131,9 @@ public class MeridianFlowForge extends Study
         boolean tp1Hit = !Double.isNaN(tp1) && (activeDir == 1 ? s.getHigh(i) >= tp1 : s.getLow(i) <= tp1);
         boolean tp2Hit = !Double.isNaN(tp2) && (activeDir == 1 ? s.getHigh(i) >= tp2 : s.getLow(i) <= tp2);
         boolean tp3Hit = !Double.isNaN(tp3) && (activeDir == 1 ? s.getHigh(i) >= tp3 : s.getLow(i) <= tp3);
+        boolean tp1First = targetHitBeforeStop(slHit, tp1Hit) && !tp1Reached;
+        boolean tp2First = targetHitBeforeStop(slHit, tp2Hit) && !tp2Reached;
+        boolean finalTargetFirst = targetHitBeforeStop(slHit, cfg.singleTarget ? tp1Hit : tp3Hit);
         if (slHit) {
           boolean beStop = Math.abs(sl - entry) < 0.0000001;
           closeBacktestTrade(stats, activeDir, entry, sl);
@@ -1131,16 +1142,16 @@ public class MeridianFlowForge extends Study
           entryIndex = -1;
           continue;
         }
-        if (tp1Hit && !tp1Reached) {
+        if (tp1First) {
           stats.tp1Hits++;
           tp1Reached = true;
           if (!cfg.singleTarget && cfg.useBreakEven) sl = entry;
         }
-        if (!cfg.singleTarget && tp2Hit && !tp2Reached) {
+        if (!cfg.singleTarget && tp2First) {
           stats.tp2Hits++;
           tp2Reached = true;
         }
-        if (cfg.singleTarget ? tp1Hit : tp3Hit) {
+        if (finalTargetFirst) {
           if (!cfg.singleTarget) stats.tp3Hits++;
           closeBacktestTrade(stats, activeDir, entry, cfg.singleTarget ? tp1 : tp3);
           activeDir = 0;
@@ -1184,10 +1195,10 @@ public class MeridianFlowForge extends Study
     OptimizerResult opt = getOptimizerResult(ctx, s, cfg, signalIndex);
     com.motivewave.platform.sdk.common.Settings st = getSettings();
     st.setBoolean(APPLY_OPTIMIZER, false);
-    if (opt == null || !opt.valid || opt.cfg == null) return opt;
+    if (opt == null || !opt.valid || opt.cfg == null) return null;
     applyOptimizerSettings(st, opt.cfg);
-    optimizerCache = opt;
-    optimizerCacheKey = optimizerKey(s, opt.cfg, signalIndex);
+    optimizerCache = null;
+    optimizerCacheKey = "";
     calculationCacheKey = "";
     return opt;
   }
@@ -1445,7 +1456,8 @@ public class MeridianFlowForge extends Study
     if (candidate.enableEma && candidate.emaFast >= candidate.emaSlow) return;
     if (candidate.enableMacd && candidate.macdFast >= candidate.macdSlow) return;
     acc.candidates++;
-    SignalArrays signals = buildOptimizationSignals(ctx, s, candidate, signalIndex);
+    int signalStart = optimizerSignalStart(signalIndex, candidate);
+    SignalArrays signals = buildOptimizationSignals(ctx, s, candidate, signalIndex, signalStart);
     double[] atrRisk = atr(s, candidate.atrRiskLen);
     BacktestStats stats = runBacktest(s, candidate, signalIndex, signals.longs, signals.shorts, atrRisk, candidate.optimizerLookback);
     double fallbackScore = scoreBacktest(stats, candidate, false);
@@ -1459,8 +1471,10 @@ public class MeridianFlowForge extends Study
     }
   }
 
-  private SignalArrays buildOptimizationSignals(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex) {
+  private SignalArrays buildOptimizationSignals(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex, int startIndex) {
     int n = s.size();
+    int evalStart = Math.max(0, startIndex);
+    int scanStart = Math.max(0, evalStart - optimizerWarmupBars(cfg));
     double[] closes = closeArray(s);
     boolean needsForge = !"Structure only".equals(cfg.signalSource);
     double[] smaFast = needsForge && cfg.enableSma ? sma(closes, cfg.smaFast) : null;
@@ -1470,7 +1484,7 @@ public class MeridianFlowForge extends Study
     double[] rsi = needsForge && cfg.enableRsi ? rsi(s, cfg.rsiLen) : null;
     Macd macd = needsForge && cfg.enableMacd ? macd(s, cfg.macdFast, cfg.macdSlow, cfg.macdSignal) : null;
     Stoch stoch = needsForge && cfg.enableStoch ? stoch(s, cfg.stochK, cfg.stochD, cfg.stochSmooth) : null;
-    double[] bbMid = needsForge && cfg.enableBb ? sma(closes, cfg.bbLen) : null;
+    Bands bb = needsForge && cfg.enableBb ? bollinger(closes, cfg.bbLen, cfg.bbMult) : null;
     double[] ao = needsForge && cfg.enableAo ? ao(s) : null;
     Sar sar = needsForge && cfg.enableSar ? sar(s, cfg.sarStart, cfg.sarInc, cfg.sarMax) : null;
     double[] cci = needsForge && cfg.enableCci ? cci(s, cfg.cciLen) : null;
@@ -1493,10 +1507,10 @@ public class MeridianFlowForge extends Study
     boolean prevForgeLong = false;
     boolean prevForgeShort = false;
 
-    for (int i = 0; i <= signalIndex && i < n; i++) {
+    for (int i = scanStart; i <= signalIndex && i < n; i++) {
       boolean confirmed = s.isBarComplete(i);
       int pivotBar = i - cfg.swingLen;
-      if (pivotBar >= cfg.swingLen && pivotBar + cfg.swingLen < n) {
+      if (pivotBar >= cfg.swingLen && pivotBar + cfg.swingLen <= signalIndex) {
         if (isPivotHigh(s, pivotBar, cfg.swingLen)) {
           lastSwingHigh = s.getHigh(pivotBar);
           lastSwingHighBar = pivotBar;
@@ -1537,7 +1551,7 @@ public class MeridianFlowForge extends Study
       boolean forgeLong = false;
       boolean forgeShort = false;
       if (needsForge) {
-        ForgeState state = forgeState(cfg, i, smaFast, smaSlow, emaFast, emaSlow, rsi, macd, stoch, bbMid,
+        ForgeState state = forgeState(cfg, i, smaFast, smaSlow, emaFast, emaSlow, rsi, macd, stoch, bb,
           closes, ao, sar, cci, adx, superTrend, tilson, smi);
         forgeLong = state.longOk;
         forgeShort = state.shortOk;
@@ -1650,10 +1664,27 @@ public class MeridianFlowForge extends Study
     return Arrays.copyOf(tmp, count);
   }
 
+  private static int optimizerSignalStart(int signalIndex, SettingsView cfg) {
+    return Math.max(0, signalIndex - Math.max(1, cfg.optimizerLookback) + 1);
+  }
+
+  private static int optimizerWarmupBars(SettingsView cfg) {
+    int indicatorWarmup = Math.max(Math.max(cfg.smaSlow, cfg.emaSlow), Math.max(cfg.macdSlow + cfg.macdSignal, cfg.adxLen + cfg.diLen));
+    indicatorWarmup = Math.max(indicatorWarmup, Math.max(cfg.stochK + cfg.stochD + cfg.stochSmooth, cfg.smiLongPeriod + cfg.smiShortPeriod + cfg.smiSignalPeriod));
+    indicatorWarmup = Math.max(indicatorWarmup, Math.max(cfg.bbLen, cfg.cciLen));
+    indicatorWarmup = Math.max(indicatorWarmup, Math.max(cfg.atrRiskLen, cfg.tilsonPeriod));
+    return Math.max(200, Math.max(cfg.swingLen * 6, indicatorWarmup * 3));
+  }
+
 
   private static String optimizerKey(DataSeries s, SettingsView cfg, int signalIndex) {
-    StringBuilder b = new StringBuilder(384);
-    b.append(signalIndex).append('|').append(s.size()).append('|').append(s.getStartTime(signalIndex)).append('|').append(s.getBarSize());
+    StringBuilder b = new StringBuilder(448);
+    long signalTime = signalIndex >= 0 && signalIndex < s.size() ? s.getStartTime(signalIndex) : 0L;
+    b.append(signalIndex).append('|').append(s.size()).append('|').append(signalTime).append('|').append(s.getBarSize());
+    if (signalIndex >= 0 && signalIndex < s.size()) {
+      b.append('|').append(s.getOpen(signalIndex)).append('|').append(s.getHigh(signalIndex))
+        .append('|').append(s.getLow(signalIndex)).append('|').append(s.getClose(signalIndex));
+    }
     b.append('|').append(cfg.optimizerLookback).append('|').append(cfg.optimizerMinTrades).append('|').append(cfg.optimizerObjective).append('|').append(cfg.optimizerSearch);
     b.append('|').append(cfg.swingLen).append('|').append(cfg.breakOnWick).append('|').append(cfg.signalMode).append('|').append(cfg.signalSource);
     b.append('|').append(cfg.useHtf).append('|').append(cfg.htfBarSize).append('|').append(cfg.htfEmaLen).append('|').append(cfg.requireAll);
@@ -1860,7 +1891,7 @@ public class MeridianFlowForge extends Study
   }
 
   private static ForgeState forgeState(SettingsView c, int i, double[] smaFast, double[] smaSlow, double[] emaFast,
-                                       double[] emaSlow, double[] rsi, Macd macd, Stoch stoch, double[] bbMid,
+                                       double[] emaSlow, double[] rsi, Macd macd, Stoch stoch, Bands bb,
                                        double[] closes, double[] ao, Sar sar, double[] cci, Adx adx, Super st,
                                        Tilson tilson, Smi smi) {
     boolean longCond = c.requireAll;
@@ -1879,8 +1910,10 @@ public class MeridianFlowForge extends Study
     }
     if (c.enableBb) {
       any = true;
-      longCond = merge(c.requireAll, longCond, !Double.isNaN(bbMid[i]) && closes[i] > bbMid[i]);
-      shortCond = merge(c.requireAll, shortCond, !Double.isNaN(bbMid[i]) && closes[i] < bbMid[i]);
+      boolean bbLong = bb != null && !Double.isNaN(bb.upper[i]) && closes[i] > bb.upper[i];
+      boolean bbShort = bb != null && !Double.isNaN(bb.lower[i]) && closes[i] < bb.lower[i];
+      longCond = merge(c.requireAll, longCond, bbLong);
+      shortCond = merge(c.requireAll, shortCond, bbShort);
     }
     if (c.enableEma) { any = true; longCond = merge(c.requireAll, longCond, emaFast[i] > emaSlow[i]); shortCond = merge(c.requireAll, shortCond, emaFast[i] < emaSlow[i]); }
     if (c.enableAo) { any = true; longCond = merge(c.requireAll, longCond, ao[i] > 0); shortCond = merge(c.requireAll, shortCond, ao[i] < 0); }
@@ -1913,6 +1946,10 @@ public class MeridianFlowForge extends Study
     return any ? new ForgeState(longCond, shortCond) : new ForgeState(false, false);
   }
 
+  private static boolean targetHitBeforeStop(boolean slHit, boolean targetHit) {
+    return targetHit && !slHit;
+  }
+
   private static boolean merge(boolean requireAll, boolean current, boolean next) {
     return requireAll ? current && next : current || next;
   }
@@ -1921,8 +1958,11 @@ public class MeridianFlowForge extends Study
 
     boolean[] bull = new boolean[n];
     boolean[] bear = new boolean[n];
-    for (int i = 0; i < n; i++) { bull[i] = true; bear[i] = true; }
-    if (!cfg.useHtf) return new HtfBias(bull, bear);
+    if (!cfg.useHtf) {
+      Arrays.fill(bull, true);
+      Arrays.fill(bear, true);
+      return new HtfBias(bull, bear);
+    }
     DataSeries htf = ctx.getDataSeries(cfg.htfBarSize);
     if (htf == null || htf.size() < cfg.htfEmaLen + 2) return new HtfBias(bull, bear);
     double[] htfEma = ema(htf, cfg.htfEmaLen);

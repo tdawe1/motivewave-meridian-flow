@@ -124,6 +124,18 @@ final class Stoch {
     this.d = d;
   }
 }
+final class Bands {
+  final double[] mid;
+  final double[] upper;
+  final double[] lower;
+
+  Bands(double[] mid, double[] upper, double[] lower) {
+    this.mid = mid;
+    this.upper = upper;
+    this.lower = lower;
+  }
+}
+
 
 final class Adx {
   final double[] plus;

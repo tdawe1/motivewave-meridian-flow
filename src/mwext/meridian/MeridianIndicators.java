@@ -137,6 +137,29 @@ final class MeridianIndicators {
     }
     return out;
   }
+  static Bands bollinger(double[] v, int len, double mult) {
+    double[] mid = sma(v, len);
+    double[] upper = fillNa(v.length);
+    double[] lower = fillNa(v.length);
+    for (int i = len - 1; i < v.length; i++) {
+      if (Double.isNaN(mid[i])) continue;
+      double sumSq = 0.0;
+      int valid = 0;
+      for (int j = i - len + 1; j <= i; j++) {
+        double value = v[j];
+        if (Double.isNaN(value) || Double.isInfinite(value)) break;
+        double delta = value - mid[i];
+        sumSq += delta * delta;
+        valid++;
+      }
+      if (valid != len) continue;
+      double width = Math.sqrt(sumSq / len) * mult;
+      upper[i] = mid[i] + width;
+      lower[i] = mid[i] - width;
+    }
+    return new Bands(mid, upper, lower);
+  }
+
 
   static double[] ema(DataSeries s, int len) {
     return ema(closeArray(s), len);
