@@ -4,6 +4,7 @@ import com.motivewave.platform.sdk.common.DrawContext;
 import com.motivewave.platform.sdk.draw.Figure;
 
 import java.awt.BasicStroke;
+import java.awt.Stroke;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.FontMetrics;
@@ -21,6 +22,7 @@ final class DashboardFigure extends Figure {
 
   private static final Font TITLE_FONT = new Font(Font.SANS_SERIF, Font.BOLD, 13);
   private static final Font FONT = new Font(Font.MONOSPACED, Font.PLAIN, 12);
+  private static final Stroke BORDER_STROKE = new BasicStroke(1.2f);
   private static final Color BACKGROUND = new Color(6, 10, 14, 228);
   private static final Color HEADER = new Color(20, 44, 58, 230);
   private static final Color BORDER = new Color(90, 170, 220, 130);
@@ -28,15 +30,18 @@ final class DashboardFigure extends Figure {
   private static final int PAD_X = 10;
   private static final int PAD_Y = 8;
   private static final int ROW_H = 17;
-  private static final int MIN_W = 380;
-  private static final int MAX_W = 520;
+  private static final int FULL_MIN_W = 560;
+  private static final int FULL_MAX_W = 820;
+  private static final int COMPACT_MIN_W = 300;
+  private static final int COMPACT_MAX_W = 430;
 
   private final DashboardRow[] rows;
   private final int count;
-
-  DashboardFigure(DashboardRow[] rows, int count) {
+  private final boolean compact;
+  DashboardFigure(DashboardRow[] rows, int count, boolean compact) {
     this.count = Math.max(0, Math.min(count, rows == null ? 0 : rows.length));
     this.rows = new DashboardRow[this.count];
+    this.compact = compact;
     if (this.count > 0) System.arraycopy(rows, 0, this.rows, 0, this.count);
   }
 
@@ -44,8 +49,10 @@ final class DashboardFigure extends Figure {
   public void layout(DrawContext ctx) {
     Rectangle chart = ctx == null ? null : ctx.getBounds();
     int height = PAD_Y * 2 + Math.max(1, count) * ROW_H;
-    int width = MIN_W;
-    if (chart != null) width = Math.max(MIN_W, Math.min(MAX_W, chart.width - 24));
+    int minW = compact ? COMPACT_MIN_W : FULL_MIN_W;
+    int maxW = compact ? COMPACT_MAX_W : FULL_MAX_W;
+    int width = minW;
+    if (chart != null) width = Math.max(minW, Math.min(maxW, chart.width - 24));
     int x = chart == null ? 12 : chart.x + 12;
     int y = chart == null ? 12 : chart.y + 12;
     setBounds(new Rectangle2D.Double(x, y, width, height));
@@ -62,24 +69,26 @@ final class DashboardFigure extends Figure {
     int h = (int)Math.round(b.getHeight());
 
     Object oldAa = gc.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
+    Stroke oldStroke = gc.getStroke();
     gc.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
     gc.setColor(BACKGROUND);
     gc.fillRoundRect(x, y, w, h, 12, 12);
     gc.setColor(BORDER);
-    gc.setStroke(new BasicStroke(1.2f));
+    gc.setStroke(BORDER_STROKE);
     gc.drawRoundRect(x, y, w, h, 12, 12);
+    gc.setStroke(oldStroke);
 
     int rowY = y + PAD_Y;
     for (int i = 0; i < count; i++) {
       DashboardRow row = rows[i];
       if (row == null) continue;
-      drawRow(gc, row, x + PAD_X, rowY, w - PAD_X * 2);
+      drawRow(gc, row, x + PAD_X, rowY, w - PAD_X * 2, compact);
       rowY += ROW_H;
     }
     gc.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAa);
   }
 
-  private static void drawRow(Graphics2D gc, DashboardRow row, int x, int y, int width) {
+  private static void drawRow(Graphics2D gc, DashboardRow row, int x, int y, int width, boolean compact) {
     if (row.header) {
       gc.setColor(HEADER);
       gc.fillRoundRect(x - 5, y - 1, width + 10, ROW_H - 1, 8, 8);
@@ -91,8 +100,9 @@ final class DashboardFigure extends Figure {
 
     FontMetrics fm = gc.getFontMetrics();
     int baseline = y + 12;
-    int labelW = row.header ? 132 : 116;
-    int extraW = row.extra == null || row.extra.isEmpty() ? 0 : Math.min(175, fm.stringWidth(row.extra));
+    int labelW = compact ? (row.header ? 54 : 48) : (row.header ? 150 : 128);
+    int extraCap = compact ? 92 : 250;
+    int extraW = row.extra == null || row.extra.isEmpty() ? 0 : Math.min(extraCap, fm.stringWidth(row.extra));
     int valueX = x + labelW;
     int extraX = x + width - extraW;
     int valueW = Math.max(20, extraX - valueX - 8);
