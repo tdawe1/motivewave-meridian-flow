@@ -33,8 +33,9 @@ final class MeridianOptimizer {
   }
 
   OptimizerResult getResult(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex) {
-    if (!cfg.showOptimizer) return null;
-    if (shouldRecompute(cfg, signalIndex)) {
+    if (!cfg.showOptimizer && !cfg.autoApplyOptimizer) return null;
+    String key = optimizerKey(s, cfg, signalIndex);
+    if (cache == null || !key.equals(cacheKey) || shouldRecompute(cfg, signalIndex)) {
       return recompute(ctx, s, cfg, signalIndex);
     }
     return cache;

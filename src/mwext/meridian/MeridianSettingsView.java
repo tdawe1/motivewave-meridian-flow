@@ -19,7 +19,7 @@ final class SettingsView {
   double slMultRaw, tpMultRaw, tp1MultRaw, tp2MultRaw, tp3MultRaw;
   boolean breakOnWick, showStruct, showBos, showOB, obMitWick, removeMitigated, obMean, obLabels;
   boolean useHtf, requireAll, enableSma, enableRsi, enableMacd, enableSt, enableStoch, enableBb, enableEma;
-  boolean enableAo, enableSar, enableCci, enableAdx, enableTilson, enableSmi, showRisk, useBreakEven, showAtrTrend, showDashboard, showOptimizer, showProjection, dashboardCompact, dashboardHideUnused, singleTarget, alertSl, alertTp, alertOb;
+  boolean enableAo, enableSar, enableCci, enableAdx, enableTilson, enableSmi, showRisk, useBreakEven, showAtrTrend, showDashboard, showOptimizer, autoApplyOptimizer, showProjection, dashboardCompact, dashboardHideUnused, singleTarget, alertSl, alertTp, alertOb;
   String dashboardPosPreset;
   String signalMode, obFrom, signalSource, riskPreset, optimizerObjective, optimizerSearch, optRefreshMode, dashboardMode, tpMode, signalGroup;
   String tilsonInput, tilsonMethod, smiInput, smiMethod, smiMode;
@@ -134,6 +134,7 @@ final class SettingsView {
     showProjection = st.getBoolean(MeridianFlowForge.SHOW_PROJECTION, true);
     projectionBars = st.getInteger(MeridianFlowForge.PROJECTION_BARS, 16);
     showOptimizer = st.getBoolean(MeridianFlowForge.SHOW_OPTIMIZER, false);
+    autoApplyOptimizer = st.getBoolean(MeridianFlowForge.AUTO_APPLY_OPTIMIZER, false);
     optimizerLookback = st.getInteger(MeridianFlowForge.OPT_LOOKBACK, 2500);
     optimizerMinTrades = st.getInteger(MeridianFlowForge.OPT_MIN_TRADES, 8);
     optimizerObjective = st.getString(MeridianFlowForge.OPT_OBJECTIVE, "Balanced");
@@ -174,7 +175,7 @@ final class SettingsView {
     c.slMultRaw = slMultRaw; c.tpMultRaw = tpMultRaw; c.tp1MultRaw = tp1MultRaw; c.tp2MultRaw = tp2MultRaw; c.tp3MultRaw = tp3MultRaw;
     c.breakOnWick = breakOnWick; c.showStruct = showStruct; c.showBos = showBos; c.showOB = showOB; c.obMitWick = obMitWick; c.removeMitigated = removeMitigated; c.obMean = obMean; c.obLabels = obLabels;
     c.useHtf = useHtf; c.requireAll = requireAll; c.enableSma = enableSma; c.enableRsi = enableRsi; c.enableMacd = enableMacd; c.enableSt = enableSt; c.enableStoch = enableStoch; c.enableBb = enableBb; c.enableEma = enableEma;
-    c.enableAo = enableAo; c.enableSar = enableSar; c.enableCci = enableCci; c.enableAdx = enableAdx; c.enableTilson = enableTilson; c.enableSmi = enableSmi; c.showRisk = showRisk; c.useBreakEven = useBreakEven; c.showAtrTrend = showAtrTrend; c.showDashboard = showDashboard; c.showOptimizer = showOptimizer; c.showProjection = showProjection; c.dashboardCompact = dashboardCompact; c.dashboardHideUnused = dashboardHideUnused; c.singleTarget = singleTarget;
+    c.enableAo = enableAo; c.enableSar = enableSar; c.enableCci = enableCci; c.enableAdx = enableAdx; c.enableTilson = enableTilson; c.enableSmi = enableSmi; c.showRisk = showRisk; c.useBreakEven = useBreakEven; c.showAtrTrend = showAtrTrend; c.showDashboard = showDashboard; c.showOptimizer = showOptimizer; c.autoApplyOptimizer = autoApplyOptimizer; c.showProjection = showProjection; c.dashboardCompact = dashboardCompact; c.dashboardHideUnused = dashboardHideUnused; c.singleTarget = singleTarget;
     c.alertSl = alertSl; c.alertTp = alertTp; c.alertOb = alertOb;
     c.signalMode = signalMode; c.obFrom = obFrom; c.signalSource = signalSource; c.riskPreset = riskPreset; c.optimizerObjective = optimizerObjective; c.optimizerSearch = optimizerSearch; c.optRefreshMode = optRefreshMode; c.optimizerDepth = optimizerDepth; c.dashboardMode = dashboardMode; c.tpMode = tpMode; c.signalGroup = signalGroup;
     c.dashboardPosPreset = dashboardPosPreset;
