@@ -65,7 +65,7 @@ import java.util.List;
 )
 public class MeridianFlowForge extends Study
 {
-  static final String VERSION = "v15-performance-throttles";
+  static final String VERSION = "v16-optimizer-cache-refactor";
   private static volatile boolean loggedCalculate;
 
   private final MeridianOptimizer optimizer = new MeridianOptimizer();
