@@ -34,11 +34,8 @@ final class MeridianOptimizer {
 
   OptimizerResult getResult(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex) {
     if (!cfg.showOptimizer && !cfg.autoApplyOptimizer) return null;
-    String key = optimizerKey(s, cfg, signalIndex);
-    if (cache == null || !key.equals(cacheKey) || shouldRecompute(cfg, signalIndex)) {
-      return recompute(ctx, s, cfg, signalIndex);
-    }
-    return cache;
+    if (!shouldRecompute(cfg, signalIndex)) return cache;
+    return recompute(ctx, s, cfg, signalIndex);
   }
 
   OptimizerResult refresh(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex) {
@@ -66,13 +63,22 @@ final class MeridianOptimizer {
   }
 
   private boolean shouldRecompute(SettingsView cfg, int signalIndex) {
-    if (cache == null) return true;
+    int floor = optimizerRefreshFloor(cfg.optimizerDepth);
     int interval = switch (cfg.optRefreshMode) {
-      case "On Demand" -> Integer.MAX_VALUE;
-      case "Every N Bars" -> Math.max(1, cfg.optRefreshInterval);
-      default -> 1; // "Every Bar"
+      case "On Demand" -> cfg.autoApplyOptimizer ? floor : Integer.MAX_VALUE;
+      case "Every N Bars" -> Math.max(floor, cfg.optRefreshInterval);
+      default -> floor;
     };
+    if (cache == null) return interval != Integer.MAX_VALUE;
     return (signalIndex - lastComputeBar) >= interval;
+  }
+
+  private static int optimizerRefreshFloor(String depth) {
+    return switch (depth) {
+      case "Deep" -> 50;
+      case "Medium" -> 20;
+      default -> 8;
+    };
   }
 
   private OptimizerResult recompute(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex) {

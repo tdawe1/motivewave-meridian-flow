@@ -139,9 +139,9 @@ final class SettingsView {
     optimizerMinTrades = st.getInteger(MeridianFlowForge.OPT_MIN_TRADES, 8);
     optimizerObjective = st.getString(MeridianFlowForge.OPT_OBJECTIVE, "Balanced");
     optimizerSearch = st.getString(MeridianFlowForge.OPT_SEARCH, "NQ 5/15m Fast");
-    optRefreshMode = st.getString(MeridianFlowForge.OPT_REFRESH_MODE, "Every Bar");
+    optRefreshMode = st.getString(MeridianFlowForge.OPT_REFRESH_MODE, "On Demand");
     optimizerDepth = st.getString(MeridianFlowForge.OPT_DEPTH, "Fast");
-    optRefreshInterval = st.getInteger(MeridianFlowForge.OPT_REFRESH_INTERVAL, 5);
+    optRefreshInterval = st.getInteger(MeridianFlowForge.OPT_REFRESH_INTERVAL, 20);
     dashboardLookback = st.getInteger(MeridianFlowForge.DASHBOARD_LOOKBACK, 5000);
     atrTrendLen = st.getInteger(MeridianFlowForge.ATR_TREND_LEN, 10);
     atrTrendMult = st.getDouble(MeridianFlowForge.ATR_TREND_MULT, 5.0);

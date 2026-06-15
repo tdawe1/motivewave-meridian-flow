@@ -65,7 +65,7 @@ import java.util.List;
 )
 public class MeridianFlowForge extends Study
 {
-  static final String VERSION = "v14-auto-optimizer-apply";
+  static final String VERSION = "v15-performance-throttles";
   private static volatile boolean loggedCalculate;
 
   private final MeridianOptimizer optimizer = new MeridianOptimizer();
@@ -335,9 +335,9 @@ public class MeridianFlowForge extends Study
     optg.addRow(new DiscreteDescriptor(OPT_OBJECTIVE, "Objective", "Balanced",
       opts("Balanced", "Net Points", "Profit Factor", "PF vs Max DD", "Recovery Factor")));
     optg.addRow(new DiscreteDescriptor(OPT_SEARCH, "Search Profile", "NQ 5/15m Fast", opts("NQ 5/15m Fast", "Around Current")));
-    optg.addRow(new DiscreteDescriptor(OPT_REFRESH_MODE, "Refresh Mode", "Every Bar",
-      opts("Every Bar", "Every N Bars", "On Demand")),
-      new IntegerDescriptor(OPT_REFRESH_INTERVAL, "Refresh Every N Bars", 5, 1, 500, 1));
+    optg.addRow(new DiscreteDescriptor(OPT_REFRESH_MODE, "Refresh Mode", "On Demand",
+      opts("On Demand", "Every N Bars", "Every Bar")),
+      new IntegerDescriptor(OPT_REFRESH_INTERVAL, "Refresh Every N Bars", 20, 1, 500, 1));
     optg.addRow(new DiscreteDescriptor(OPT_DEPTH, "Optimizer Depth", "Fast", opts("Fast", "Medium", "Deep")));
 
     SettingTab visual = sd.addTab("Visual");
@@ -775,7 +775,7 @@ public class MeridianFlowForge extends Study
         s.setDouble(i, Values.ATR_TREND, null);
       }
       prevStructTrend = structTrend;
-      s.setComplete(i);
+      s.setComplete(i, i < n - 1);
     }
 
     for (OBZone ob : zones) drawOB(s, ob, cfg);
@@ -1267,10 +1267,11 @@ public class MeridianFlowForge extends Study
   }
 
   private static int latestCompleteIndex(DataSeries s) {
-    for (int i = s.size() - 1; i >= 0; i--) {
+    int lastClosed = Math.max(0, s.size() - 2);
+    for (int i = lastClosed; i >= 0; i--) {
       if (s.isBarComplete(i)) return i;
     }
-    return s.size() - 1;
+    return lastClosed;
   }
 
   private static long timeAtOrProjected(DataSeries s, int index) {
