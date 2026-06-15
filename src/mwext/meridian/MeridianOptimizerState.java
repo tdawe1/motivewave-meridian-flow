@@ -4,6 +4,8 @@ final class OptimizerResult {
   boolean valid;
   int candidates;
   int bars;
+  int computedAtBar = -1;
+  long computeMillis;
   double score;
   String objective;
   String params;

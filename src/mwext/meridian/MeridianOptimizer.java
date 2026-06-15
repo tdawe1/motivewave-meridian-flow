@@ -31,15 +31,52 @@ final class MeridianOptimizer {
   private int lastComputeBar = -1;
   private String cachePlanKey = "";
   private OptimizerInputs activeInputs;
+  private String statusValue = "OFF";
+  private String statusExtra = "optimizer disabled";
+  private int statusKind;
 
   OptimizerResult getResult() {
     return cache;
   }
+  OptimizerResult currentResult(DataSeries s, SettingsView cfg) {
+    return cache != null && optimizerPlanKey(s, cfg).equals(cachePlanKey) ? cache : null;
+  }
+
+  void updateStatus(DataSeries s, SettingsView cfg, int signalIndex) {
+    if (!cfg.showOptimizer && !cfg.autoApplyOptimizer) {
+      setStatus("OFF", "optimizer disabled", 0);
+      return;
+    }
+    if (cache == null) {
+      setStatus("READY", "click Apply to run", 3);
+      return;
+    }
+    if (!optimizerPlanKey(s, cfg).equals(cachePlanKey)) {
+      setStatus("STALE", "settings/data changed; click Apply", 2);
+      return;
+    }
+    setStatus("CACHED", cacheAgeText(cfg, signalIndex), 1);
+  }
 
   OptimizerResult getResult(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex) {
-    if (!cfg.showOptimizer && !cfg.autoApplyOptimizer) return null;
+    if (!cfg.showOptimizer && !cfg.autoApplyOptimizer) {
+      setStatus("OFF", "optimizer disabled", 0);
+      return null;
+    }
     String planKey = optimizerPlanKey(s, cfg);
-    if (cache != null && planKey.equals(cachePlanKey) && !shouldRecompute(cfg, signalIndex)) return cache;
+    boolean planMatches = cache != null && planKey.equals(cachePlanKey);
+    if (cache == null && "On Demand".equals(cfg.optRefreshMode) && !cfg.autoApplyOptimizer) {
+      setStatus("READY", "click Apply to run", 3);
+      return null;
+    }
+    if (cache != null && !planMatches && "On Demand".equals(cfg.optRefreshMode) && !cfg.autoApplyOptimizer) {
+      setStatus("STALE", "settings changed; click Apply", 2);
+      return cache;
+    }
+    if (cache != null && planMatches && !shouldRecompute(cfg, signalIndex)) {
+      setStatus("CACHED", cacheAgeText(cfg, signalIndex), 1);
+      return cache;
+    }
     return recompute(ctx, s, cfg, signalIndex, planKey);
   }
 
@@ -53,6 +90,7 @@ final class MeridianOptimizer {
     st.setBoolean(MeridianFlowForge.APPLY_OPTIMIZER, false);
     if (result != null && result.valid && result.cfg != null) {
       applyOptimizerSettings(st, result.cfg);
+      setStatus("APPLIED", result.candidates + " tries • " + result.computeMillis + "ms", 1);
     }
     return result;
   }
@@ -62,10 +100,26 @@ final class MeridianOptimizer {
     cacheKey = "";
     cachePlanKey = "";
     lastComputeBar = -1;
+    setStatus("RESET", "cache cleared", 2);
   }
 
   int lastComputeBar() {
     return lastComputeBar;
+  }
+  String statusValue() {
+    return statusValue;
+  }
+
+  String statusExtra() {
+    return statusExtra;
+  }
+
+  int statusKind() {
+    return statusKind;
+  }
+
+  void markAutoApplied(OptimizerResult result) {
+    if (result != null) setStatus("AUTO APPLIED", result.candidates + " tries • " + result.computeMillis + "ms", 1);
   }
 
   private boolean shouldRecompute(SettingsView cfg, int signalIndex) {
@@ -93,12 +147,19 @@ final class MeridianOptimizer {
 
   private OptimizerResult recompute(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex, String planKey) {
     String key = optimizerKey(s, cfg, signalIndex);
-    if (cache != null && key.equals(cacheKey) && lastComputeBar == signalIndex) return cache;
+    if (cache != null && key.equals(cacheKey) && lastComputeBar == signalIndex) {
+      setStatus("CACHED", "same bar • " + cacheAgeText(cfg, signalIndex), 1);
+      return cache;
+    }
+    long start = System.nanoTime();
     OptimizerResult result = runOptimizer(ctx, s, cfg, signalIndex);
+    result.computeMillis = Math.max(0L, (System.nanoTime() - start) / 1_000_000L);
+    result.computedAtBar = signalIndex;
     cache = result;
     cacheKey = key;
     cachePlanKey = planKey;
     lastComputeBar = signalIndex;
+    setStatus(result.valid ? "UPDATED" : "NO RESULT", result.candidates + " tries • " + result.computeMillis + "ms", result.valid ? 1 : 2);
     return result;
   }
 
@@ -828,6 +889,29 @@ final class MeridianOptimizer {
     return requireAll ? current && next : current || next;
   }
 
+
+  private String cacheAgeText(SettingsView cfg, int signalIndex) {
+    int barsAgo = lastComputeBar < 0 ? 0 : Math.max(0, signalIndex - lastComputeBar);
+    int interval = refreshInterval(cfg);
+    if (interval == Integer.MAX_VALUE) return barsAgo + " bars ago • on demand";
+    int next = Math.max(0, interval - barsAgo);
+    return barsAgo + " bars ago • next " + next;
+  }
+
+  private int refreshInterval(SettingsView cfg) {
+    int floor = optimizerRefreshFloor(cfg.optimizerDepth);
+    return switch (cfg.optRefreshMode) {
+      case "On Demand" -> cfg.autoApplyOptimizer ? floor : Integer.MAX_VALUE;
+      case "Every N Bars" -> Math.max(floor, cfg.optRefreshInterval);
+      default -> floor;
+    };
+  }
+
+  private void setStatus(String value, String extra, int kind) {
+    statusValue = value == null ? "" : value;
+    statusExtra = extra == null ? "" : extra;
+    statusKind = kind;
+  }
   private static final class OptimizerInputs {
     final DataContext ctx;
     final DataSeries s;

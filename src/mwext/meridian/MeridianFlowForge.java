@@ -65,7 +65,7 @@ import java.util.List;
 )
 public class MeridianFlowForge extends Study
 {
-  static final String VERSION = "v16-optimizer-cache-refactor";
+  static final String VERSION = "v18-stable-optimizer-status";
   private static volatile boolean loggedCalculate;
 
   private final MeridianOptimizer optimizer = new MeridianOptimizer();
@@ -441,14 +441,16 @@ public class MeridianFlowForge extends Study
     SettingsView cfg = new SettingsView();
     cfg.read(getSettings(), ctx);
     int signalIndex = latestCompleteIndex(s);
+    optimizer.updateStatus(s, cfg, signalIndex);
     if (getSettings().getBoolean(APPLY_OPTIMIZER, false)) {
       OptimizerResult applied = optimizer.apply(ctx, s, cfg, signalIndex, getSettings());
       if (applied != null && applied.valid && applied.cfg != null) { cfg = applied.cfg; calculationCacheKey = ""; }
     }
     else if (cfg.autoApplyOptimizer) {
-      OptimizerResult opt = optimizer.getResult(ctx, s, cfg, signalIndex);
+      OptimizerResult opt = optimizer.currentResult(s, cfg);
       if (opt != null && opt.valid && opt.cfg != null && !sameTuning(cfg, opt.cfg)) {
         MeridianOptimizer.applyOptimizerSettings(getSettings(), opt.cfg);
+        optimizer.markAutoApplied(opt);
         cfg = opt.cfg;
         calculationCacheKey = "";
       }
@@ -944,7 +946,7 @@ public class MeridianFlowForge extends Study
                              double[] atrRisk, double[] rsi, Stoch stoch, Sar sar, Tilson tilson, Smi smi) {
     if (signalIndex < 0 || signalIndex >= s.size()) return;
     BacktestStats stats = MeridianBacktest.runBacktest(s, cfg, signalIndex, longSignals, shortSignals, atrRisk, cfg.dashboardLookback);
-    OptimizerResult opt = cfg.showOptimizer ? optimizer.getResult(ctx, s, cfg, signalIndex) : null;
+    OptimizerResult opt = cfg.showOptimizer ? optimizer.getResult() : null;
     int bars = Math.min(cfg.dashboardLookback, signalIndex + 1);
     String signal = longSignals[signalIndex] ? "LONG" : shortSignals[signalIndex] ? "SHORT" : "NEUTRAL";
     Color signalColor = longSignals[signalIndex] ? cfg.bullColor : shortSignals[signalIndex] ? cfg.bearColor : cfg.neutralColor;
@@ -959,6 +961,7 @@ public class MeridianFlowForge extends Study
       rows[row++] = headerRow("MF", VERSION, signal, signalColor);
       rows[row++] = dashRow("Sig", signal, enabledCount(cfg) + "F " + (cfg.requireAll ? "ALL" : "ANY"), signalColor);
       rows[row++] = dashRow("Grp", cfg.signalGroup, "Manual".equals(cfg.signalGroup) ? cfg.signalSource : signalGroupRegime(cfg), DashboardFigure.ACCENT);
+      rows[row++] = dashRow("Run", optimizer.statusValue(), optimizer.statusExtra(), optimizerStatusColor(optimizer.statusKind()));
       rows[row++] = dashRow("BT", bars + "b/" + stats.trades + "t", formatPct(winRate) + " WR", DashboardFigure.TEXT);
       rows[row++] = dashRow("PF", formatRatio(profitFactor), "NPF " + formatRatio(netProfitFactor), ratioColor(profitFactor, 1.0));
       rows[row++] = dashRow("Net", formatSigned(stats.netPoints), "DD " + formatPoints(stats.maxDrawdownPoints), signedColor(stats.netPoints));
@@ -982,6 +985,7 @@ public class MeridianFlowForge extends Study
       rows[row++] = dashRow("Net points", formatSigned(stats.netPoints), "DD " + formatPoints(stats.maxDrawdownPoints) + " • RF " + formatRatio(recoveryFactor), signedColor(stats.netPoints));
       rows[row++] = dashRow("Gross W/L", formatSigned(stats.grossWinPoints), formatSigned(stats.grossLossPoints), signedColor(stats.grossWinPoints + stats.grossLossPoints));
       rows[row++] = dashRow("Stops / targets", stats.stops + " stops", targetStats(stats, cfg), stats.stops <= stats.wins ? DashboardFigure.GOOD : DashboardFigure.WARN);
+      rows[row++] = dashRow("Optimizer state", optimizer.statusValue(), optimizer.statusExtra(), optimizerStatusColor(optimizer.statusKind()));
       if (opt != null && opt.stats != null) {
         rows[row++] = headerRow("Optimizer", opt.objective + " · " + depthLabel(cfg.optimizerDepth), opt.valid ? opt.candidates + " tries" : "below min trades", opt.valid ? DashboardFigure.GOOD : DashboardFigure.WARN);
         rows[row++] = dashRow("Apply status", optStale ? "REC OUT OF DATE" : "Current matches rec", optStale ? (cfg.autoApplyOptimizer ? "auto apply pending" : "click Apply") : (cfg.autoApplyOptimizer ? "auto apply on" : ""), optStale ? DashboardFigure.WARN : DashboardFigure.GOOD);
@@ -1000,6 +1004,15 @@ public class MeridianFlowForge extends Study
     addFigure(lastDashboardFigure);
   }
 
+
+  private static Color optimizerStatusColor(int kind) {
+    return switch (kind) {
+      case 1 -> DashboardFigure.GOOD;
+      case 2 -> DashboardFigure.WARN;
+      case 3 -> DashboardFigure.ACCENT;
+      default -> DashboardFigure.TEXT;
+    };
+  }
   private static DashboardRow headerRow(String label, String value, String extra, Color color) {
     return new DashboardRow(label, value, extra, color, true);
   }
