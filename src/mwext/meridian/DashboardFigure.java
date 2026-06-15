@@ -27,6 +27,7 @@ final class DashboardFigure extends Figure {
   private static final Color HEADER = new Color(20, 44, 58, 230);
   private static final Color BORDER = new Color(90, 170, 220, 130);
   private static final Color MUTED = new Color(155, 166, 176);
+  private static final Color APPLY_BG = new Color(255, 152, 0, 220);
   private static final int PAD_X = 10;
   private static final int PAD_Y = 8;
   private static final int ROW_H = 17;
@@ -34,27 +35,59 @@ final class DashboardFigure extends Figure {
   private static final int FULL_MAX_W = 820;
   private static final int COMPACT_MIN_W = 300;
   private static final int COMPACT_MAX_W = 430;
+  private static final int APPLY_BTN_H = 22;
 
   private final DashboardRow[] rows;
   private final int count;
   private final boolean compact;
-  DashboardFigure(DashboardRow[] rows, int count, boolean compact) {
+  private final String posPreset;
+  private final int xOffset;
+  private final int yOffset;
+  private final double scale;
+  private final boolean optStale;
+
+  private Rectangle2D applyBounds;
+
+  DashboardFigure(DashboardRow[] rows, int count, boolean compact,
+                  String posPreset, int xOffset, int yOffset, double scale,
+                  boolean optStale) {
     this.count = Math.max(0, Math.min(count, rows == null ? 0 : rows.length));
     this.rows = new DashboardRow[this.count];
     this.compact = compact;
+    this.posPreset = posPreset == null ? "Top Left" : posPreset;
+    this.xOffset = Math.max(0, Math.min(xOffset, 200));
+    this.yOffset = Math.max(0, Math.min(yOffset, 200));
+    this.scale = Math.max(0.5, Math.min(scale, 2.0));
+    this.optStale = optStale;
     if (this.count > 0) System.arraycopy(rows, 0, this.rows, 0, this.count);
   }
+
+  Rectangle2D applyBounds() { return applyBounds; }
 
   @Override
   public void layout(DrawContext ctx) {
     Rectangle chart = ctx == null ? null : ctx.getBounds();
-    int height = PAD_Y * 2 + Math.max(1, count) * ROW_H;
-    int minW = compact ? COMPACT_MIN_W : FULL_MIN_W;
-    int maxW = compact ? COMPACT_MAX_W : FULL_MAX_W;
+    int minW = (int)Math.round((compact ? COMPACT_MIN_W : FULL_MIN_W) * scale);
+    int maxW = (int)Math.round((compact ? COMPACT_MAX_W : FULL_MAX_W) * scale);
     int width = minW;
     if (chart != null) width = Math.max(minW, Math.min(maxW, chart.width - 24));
-    int x = chart == null ? 12 : chart.x + 12;
-    int y = chart == null ? 12 : chart.y + 12;
+    int height = PAD_Y * 2 + Math.max(1, count) * ROW_H;
+    if (optStale) height += APPLY_BTN_H + 4;
+
+    int chartW = chart == null ? 800 : chart.width;
+    int chartH = chart == null ? 600 : chart.height;
+    int ox = Math.max(0, Math.min(xOffset, chartW - width));
+    int oy = Math.max(0, Math.min(yOffset, chartH - height));
+
+    int x, y;
+    switch (posPreset) {
+      case "Top Right" -> { x = chartW - width - ox; y = oy; }
+      case "Bottom Left" -> { x = ox; y = chartH - height - oy; }
+      case "Bottom Right" -> { x = chartW - width - ox; y = chartH - height - oy; }
+      default -> { x = ox; y = oy; } // "Top Left" or "Custom"
+    }
+    if (chart != null) { x += chart.x; y += chart.y; }
+
     setBounds(new Rectangle2D.Double(x, y, width, height));
   }
 
@@ -83,6 +116,24 @@ final class DashboardFigure extends Figure {
         if (row == null) continue;
         drawRow(g, row, x + PAD_X, rowY, w - PAD_X * 2, compact);
         rowY += ROW_H;
+      }
+
+      if (optStale) {
+        int btnX = x + PAD_X;
+        int btnY = y + h - APPLY_BTN_H - 6;
+        int btnW = w - PAD_X * 2;
+        applyBounds = new Rectangle2D.Double(btnX, btnY, btnW, APPLY_BTN_H);
+
+        g.setColor(APPLY_BG);
+        g.fillRoundRect(btnX, btnY, btnW, APPLY_BTN_H, 8, 8);
+        g.setColor(Color.WHITE);
+        g.setFont(TITLE_FONT);
+        FontMetrics fm = g.getFontMetrics();
+        String label = "\u25B6 APPLY OPTIMIZER";
+        int labelW = fm.stringWidth(label);
+        g.drawString(label, btnX + (btnW - labelW) / 2, btnY + 15);
+      } else {
+        applyBounds = null;
       }
     } finally {
       g.dispose();
@@ -121,14 +172,14 @@ final class DashboardFigure extends Figure {
   private static String clip(String text, FontMetrics fm, int maxWidth) {
     if (text == null) return "";
     if (maxWidth <= 0 || fm.stringWidth(text) <= maxWidth) return text;
-    if (maxWidth <= fm.stringWidth("…")) return "";
+    if (maxWidth <= fm.stringWidth("\u2026")) return "";
     int lo = 0;
     int hi = text.length();
     while (lo < hi) {
       int mid = (lo + hi + 1) >>> 1;
-      if (fm.stringWidth(text.substring(0, mid) + "…") <= maxWidth) lo = mid;
+      if (fm.stringWidth(text.substring(0, mid) + "\u2026") <= maxWidth) lo = mid;
       else hi = mid - 1;
     }
-    return lo <= 0 ? "" : text.substring(0, lo) + "…";
+    return lo <= 0 ? "" : text.substring(0, lo) + "\u2026";
   }
 }

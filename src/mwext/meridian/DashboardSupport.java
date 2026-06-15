@@ -15,16 +15,28 @@ final class DashboardSupport {
     return value > neutral ? DashboardFigure.GOOD : value < neutral ? DashboardFigure.BAD : DashboardFigure.WARN;
   }
 
-  static String parameterSummary(MeridianFlowForge.SettingsView cfg) {
+  static String parameterSummary(SettingsView cfg) {
     String filters = parameterSummaryFilters(cfg, true);
     return parameterSummaryCore(cfg) + " | " + parameterSummaryRisk(cfg) + (filters.isEmpty() ? "" : " | " + filters);
   }
 
-  static String parameterSummaryCore(MeridianFlowForge.SettingsView cfg) {
-    return "Sw " + cfg.swingLen + " • " + cfg.signalSource + " • " + cfg.signalMode;
+  static String parameterSummaryCore(SettingsView cfg) {
+    String group = "Manual".equals(cfg.signalGroup) ? cfg.signalSource : cfg.signalGroup;
+    return "Sw " + cfg.swingLen + " • " + group + " • " + cfg.signalMode;
   }
 
-  static String parameterSummaryRisk(MeridianFlowForge.SettingsView cfg) {
+  static String signalGroupRegime(SettingsView cfg) {
+    return switch (cfg.signalGroup) {
+      case "Trend Confirmation" -> "Trending";
+      case "Momentum Pullback" -> "Trend w/ Pullback";
+      case "Mean Reversion" -> "Ranging / Mean-Reverting";
+      case "Structure Only" -> "Structure / No Filter";
+      case "Balanced" -> "Balanced Multi-Filter";
+      default -> cfg.signalSource;
+    };
+  }
+
+  static String parameterSummaryRisk(SettingsView cfg) {
     if (cfg.singleTarget) {
       return "ATR " + cfg.atrRiskLen + " SLx" + formatOne(cfg.slMultEff) + " TPx" + formatOne(cfg.tpEff);
     }
@@ -32,7 +44,7 @@ final class DashboardSupport {
       + formatOne(cfg.tp1Eff) + "/" + formatOne(cfg.tp2Eff) + "/" + formatOne(cfg.tp3Eff);
   }
 
-  static String parameterSummaryFilters(MeridianFlowForge.SettingsView cfg, boolean hideUnused) {
+  static String parameterSummaryFilters(SettingsView cfg, boolean hideUnused) {
     StringBuilder b = new StringBuilder(128);
     appendPart(b, cfg.enableSma ? "SMA " + cfg.smaFast + "/" + cfg.smaSlow : hideUnused ? "" : "SMA off");
     appendPart(b, cfg.enableRsi ? "RSI " + cfg.rsiLen + " " + formatOne(cfg.rsiLong) + "/" + formatOne(cfg.rsiShort) : hideUnused ? "" : "RSI off");
@@ -49,16 +61,16 @@ final class DashboardSupport {
     b.append(part);
   }
 
-  static String targetMessage(MeridianFlowForge.SettingsView cfg, double tp1, double tp2, double tp3) {
+  static String targetMessage(SettingsView cfg, double tp1, double tp2, double tp3) {
     if (cfg.singleTarget) return " | TP " + formatPrice(tp1);
     return " | TP1 " + formatPrice(tp1) + " | TP2 " + formatPrice(tp2) + " | TP3 " + formatPrice(tp3);
   }
 
-  static String targetStats(BacktestStats stats, MeridianFlowForge.SettingsView cfg) {
+  static String targetStats(BacktestStats stats, SettingsView cfg) {
     return cfg.singleTarget ? "TP " + stats.tp1Hits : "TP " + stats.tp1Hits + "/" + stats.tp2Hits + "/" + stats.tp3Hits;
   }
 
-  static boolean sameTuning(MeridianFlowForge.SettingsView a, MeridianFlowForge.SettingsView b) {
+  static boolean sameTuning(SettingsView a, SettingsView b) {
     if (a == null || b == null) return false;
     return a.swingLen == b.swingLen && a.breakOnWick == b.breakOnWick
       && a.atrRiskLen == b.atrRiskLen && a.useBreakEven == b.useBreakEven
@@ -93,7 +105,7 @@ final class DashboardSupport {
       && eq(a.smiInput, b.smiInput) && eq(a.smiMethod, b.smiMethod) && eq(a.smiMode, b.smiMode);
   }
 
-  static String coreFilterSnapshot(MeridianFlowForge.SettingsView cfg, int i, double close, double[] rsi, Stoch stoch, Sar sar) {
+  static String coreFilterSnapshot(SettingsView cfg, int i, double close, double[] rsi, Stoch stoch, Sar sar) {
     StringBuilder b = new StringBuilder(96);
     if (cfg.enableRsi && rsi != null && i < rsi.length) {
       double v = rsi[i];
@@ -116,7 +128,7 @@ final class DashboardSupport {
     return b.length() == 0 ? "none" : b.toString();
   }
 
-  static String strategyFilterSnapshot(MeridianFlowForge.SettingsView cfg, int i, Tilson tilson, Smi smi) {
+  static String strategyFilterSnapshot(SettingsView cfg, int i, Tilson tilson, Smi smi) {
     StringBuilder b = new StringBuilder(96);
     if (cfg.enableTilson && tilson != null) {
       double v = tilson.value[i];

@@ -44,6 +44,7 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
+import java.awt.Point;
 import java.awt.Stroke;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
@@ -64,129 +65,137 @@ import java.util.List;
 )
 public class MeridianFlowForge extends Study
 {
-  private static final String VERSION = "v11-dashboard-apply-tp";
+  static final String VERSION = "v12-extract-backtest-optimizer";
   private static volatile boolean loggedCalculate;
-  private static final int MAX_OPTIMIZER_CANDIDATES = 560;
 
-  private volatile String optimizerCacheKey = "";
+  private final MeridianOptimizer optimizer = new MeridianOptimizer();
   private volatile String calculationCacheKey = "";
-  private OptimizerResult optimizerCache;
+  private volatile DashboardFigure lastDashboardFigure;
+  private volatile SettingsView lastDashboardCfg;
+  private volatile int lastDashboardSignalIndex = -1;
 
-  private static final String SWING_LEN = "swingLen";
-  private static final String BREAK_SRC = "breakSrc";
-  private static final String SIGNAL_MODE = "signalMode";
-  private static final String SIGNAL_SOURCE = "signalSource";
-  private static final String SHOW_STRUCT = "showStruct";
-  private static final String SHOW_BOS = "showBos";
+  static final String SWING_LEN = "swingLen";
+  static final String BREAK_SRC = "breakSrc";
+  static final String SIGNAL_MODE = "signalMode";
+  static final String SIGNAL_SOURCE = "signalSource";
+  static final String SHOW_STRUCT = "showStruct";
+  static final String SHOW_BOS = "showBos";
 
-  private static final String SHOW_OB = "showOB";
-  private static final String OB_FROM = "obFrom";
-  private static final String OB_MIT_SRC = "obMitSrc";
-  private static final String REMOVE_MIT = "removeMitigated";
-  private static final String OB_LOOKBACK = "obLookback";
-  private static final String MAX_OB = "maxOB";
-  private static final String OB_ALPHA = "obAlpha";
-  private static final String OB_MEAN = "obMean";
-  private static final String OB_LABELS = "obLabels";
+  static final String SHOW_OB = "showOB";
+  static final String OB_FROM = "obFrom";
+  static final String OB_MIT_SRC = "obMitSrc";
+  static final String REMOVE_MIT = "removeMitigated";
+  static final String OB_LOOKBACK = "obLookback";
+  static final String MAX_OB = "maxOB";
+  static final String OB_ALPHA = "obAlpha";
+  static final String OB_MEAN = "obMean";
+  static final String OB_LABELS = "obLabels";
 
-  private static final String USE_HTF = "useHtf";
-  private static final String HTF_BAR_SIZE = "htfBarSize";
-  private static final String HTF_EMA_LEN = "htfEmaLen";
+  static final String USE_HTF = "useHtf";
+  static final String HTF_BAR_SIZE = "htfBarSize";
+  static final String HTF_EMA_LEN = "htfEmaLen";
 
-  private static final String REQUIRE_ALL = "requireAll";
-  private static final String ENABLE_SMA = "enableSma";
-  private static final String SMA_FAST = "smaFast";
-  private static final String SMA_SLOW = "smaSlow";
-  private static final String ENABLE_RSI = "enableRsi";
-  private static final String RSI_LEN = "rsiLen";
-  private static final String RSI_LONG = "rsiLong";
-  private static final String RSI_SHORT = "rsiShort";
-  private static final String ENABLE_MACD = "enableMacd";
-  private static final String MACD_FAST = "macdFast";
-  private static final String MACD_SLOW = "macdSlow";
-  private static final String MACD_SIGNAL = "macdSignal";
-  private static final String ENABLE_ST = "enableSt";
-  private static final String ST_FACTOR = "stFactor";
-  private static final String ST_LEN = "stLen";
-  private static final String ENABLE_STOCH = "enableStoch";
-  private static final String STOCH_K = "stochK";
-  private static final String STOCH_D = "stochD";
-  private static final String STOCH_SMOOTH = "stochSmooth";
-  private static final String ENABLE_BB = "enableBb";
-  private static final String BB_LEN = "bbLen";
-  private static final String BB_MULT = "bbMult";
-  private static final String ENABLE_EMA = "enableEma";
-  private static final String EMA_FAST = "emaFast";
-  private static final String EMA_SLOW = "emaSlow";
-  private static final String ENABLE_AO = "enableAo";
-  private static final String ENABLE_SAR = "enableSar";
-  private static final String SAR_START = "sarStart";
-  private static final String SAR_INC = "sarInc";
-  private static final String SAR_MAX = "sarMax";
-  private static final String ENABLE_CCI = "enableCci";
-  private static final String CCI_LEN = "cciLen";
-  private static final String CCI_LONG = "cciLong";
-  private static final String CCI_SHORT = "cciShort";
-  private static final String ENABLE_ADX = "enableAdx";
-  private static final String ENABLE_TILSON = "enableTilson";
-  private static final String TILSON_INPUT = "tilsonInput";
-  private static final String TILSON_METHOD = "tilsonMethod";
-  private static final String TILSON_PERIOD = "tilsonPeriod";
-  private static final String ENABLE_SMI = "enableSmi";
-  private static final String SMI_INPUT = "smiInput";
-  private static final String SMI_METHOD = "smiMethod";
-  private static final String SMI_LONG_PERIOD = "smiLongPeriod";
-  private static final String SMI_SHORT_PERIOD = "smiShortPeriod";
-  private static final String SMI_SIGNAL_PERIOD = "smiSignalPeriod";
-  private static final String SMI_TOP_GUIDE = "smiTopGuide";
-  private static final String SMI_BOTTOM_GUIDE = "smiBottomGuide";
-  private static final String SMI_MODE = "smiMode";
-  private static final String ADX_LEN = "adxLen";
-  private static final String DI_LEN = "diLen";
-  private static final String ADX_THRESHOLD = "adxThreshold";
+  static final String REQUIRE_ALL = "requireAll";
+  static final String SIGNAL_GROUP = "signalGroup";
+  static final String ENABLE_SMA = "enableSma";
+  static final String SMA_FAST = "smaFast";
+  static final String SMA_SLOW = "smaSlow";
+  static final String ENABLE_RSI = "enableRsi";
+  static final String RSI_LEN = "rsiLen";
+  static final String RSI_LONG = "rsiLong";
+  static final String RSI_SHORT = "rsiShort";
+  static final String ENABLE_MACD = "enableMacd";
+  static final String MACD_FAST = "macdFast";
+  static final String MACD_SLOW = "macdSlow";
+  static final String MACD_SIGNAL = "macdSignal";
+  static final String ENABLE_ST = "enableSt";
+  static final String ST_FACTOR = "stFactor";
+  static final String ST_LEN = "stLen";
+  static final String ENABLE_STOCH = "enableStoch";
+  static final String STOCH_K = "stochK";
+  static final String STOCH_D = "stochD";
+  static final String STOCH_SMOOTH = "stochSmooth";
+  static final String ENABLE_BB = "enableBb";
+  static final String BB_LEN = "bbLen";
+  static final String BB_MULT = "bbMult";
+  static final String ENABLE_EMA = "enableEma";
+  static final String EMA_FAST = "emaFast";
+  static final String EMA_SLOW = "emaSlow";
+  static final String ENABLE_AO = "enableAo";
+  static final String ENABLE_SAR = "enableSar";
+  static final String SAR_START = "sarStart";
+  static final String SAR_INC = "sarInc";
+  static final String SAR_MAX = "sarMax";
+  static final String ENABLE_CCI = "enableCci";
+  static final String CCI_LEN = "cciLen";
+  static final String CCI_LONG = "cciLong";
+  static final String CCI_SHORT = "cciShort";
+  static final String ENABLE_ADX = "enableAdx";
+  static final String ENABLE_TILSON = "enableTilson";
+  static final String TILSON_INPUT = "tilsonInput";
+  static final String TILSON_METHOD = "tilsonMethod";
+  static final String TILSON_PERIOD = "tilsonPeriod";
+  static final String ENABLE_SMI = "enableSmi";
+  static final String SMI_INPUT = "smiInput";
+  static final String SMI_METHOD = "smiMethod";
+  static final String SMI_LONG_PERIOD = "smiLongPeriod";
+  static final String SMI_SHORT_PERIOD = "smiShortPeriod";
+  static final String SMI_SIGNAL_PERIOD = "smiSignalPeriod";
+  static final String SMI_TOP_GUIDE = "smiTopGuide";
+  static final String SMI_BOTTOM_GUIDE = "smiBottomGuide";
+  static final String SMI_MODE = "smiMode";
+  static final String ADX_LEN = "adxLen";
+  static final String DI_LEN = "diLen";
+  static final String ADX_THRESHOLD = "adxThreshold";
 
-  private static final String RISK_PRESET = "riskPreset";
-  private static final String SHOW_OPTIMIZER = "showOptimizer";
-  private static final String OPT_LOOKBACK = "optimizerLookback";
-  private static final String OPT_MIN_TRADES = "optimizerMinTrades";
-  private static final String OPT_OBJECTIVE = "optimizerObjective";
-  private static final String OPT_SEARCH = "optimizerSearch";
-  private static final String APPLY_OPTIMIZER = "applyOptimizer";
-  private static final String DASHBOARD_MODE = "dashboardMode";
-  private static final String DASHBOARD_HIDE_UNUSED = "dashboardHideUnused";
-  private static final String SHOW_DASHBOARD = "showDashboard";
-  private static final String DASHBOARD_LOOKBACK = "dashboardLookback";
-  private static final String SHOW_PROJECTION = "showProjection";
-  private static final String PROJECTION_BARS = "projectionBars";
+  static final String RISK_PRESET = "riskPreset";
+  static final String SHOW_OPTIMIZER = "showOptimizer";
+  static final String OPT_LOOKBACK = "optimizerLookback";
+  static final String OPT_MIN_TRADES = "optimizerMinTrades";
+  static final String OPT_OBJECTIVE = "optimizerObjective";
+  static final String OPT_SEARCH = "optimizerSearch";
+  static final String OPT_REFRESH_MODE = "optimizerRefreshMode";
+  static final String OPT_REFRESH_INTERVAL = "optimizerRefreshInterval";
+  static final String APPLY_OPTIMIZER = "applyOptimizer";
+  static final String DASHBOARD_MODE = "dashboardMode";
+  static final String DASHBOARD_HIDE_UNUSED = "dashboardHideUnused";
+  static final String SHOW_DASHBOARD = "showDashboard";
+  static final String DASHBOARD_LOOKBACK = "dashboardLookback";
+  static final String SHOW_PROJECTION = "showProjection";
+  static final String PROJECTION_BARS = "projectionBars";
+  static final String DASHBOARD_POS_PRESET = "dashboardPosPreset";
+  static final String DASHBOARD_X_OFFSET = "dashboardXOffset";
+  static final String DASHBOARD_Y_OFFSET = "dashboardYOffset";
+  static final String DASHBOARD_SCALE = "dashboardScale";
 
-  private static final String ATR_RISK_LEN = "atrRiskLen";
-  private static final String SL_MULT = "slMult";
-  private static final String TP_MODE = "tpMode";
-  private static final String TP_MULT = "tpMult";
-  private static final String TP1_MULT = "tp1Mult";
-  private static final String TP2_MULT = "tp2Mult";
-  private static final String TP3_MULT = "tp3Mult";
-  private static final String SHOW_RISK = "showRisk";
-  private static final String USE_BE = "useBreakEven";
+  static final String ATR_RISK_LEN = "atrRiskLen";
+  static final String SL_MULT = "slMult";
+  static final String TP_MODE = "tpMode";
+  static final String TP_MULT = "tpMult";
+  static final String TP1_MULT = "tp1Mult";
+  static final String TP2_MULT = "tp2Mult";
+  static final String TP3_MULT = "tp3Mult";
+  static final String SHOW_RISK = "showRisk";
+  static final String USE_BE = "useBreakEven";
 
-  private static final String SHOW_ATR_TREND = "showAtrTrend";
-  private static final String ATR_TREND_LEN = "atrTrendLen";
-  private static final String ATR_TREND_MULT = "atrTrendMult";
-  private static final String ATR_SMOOTH = "atrSmooth";
-  private static final String ATR_TREND_PATH = "atrTrendPath";
+  static final String SHOW_ATR_TREND = "showAtrTrend";
+  static final String ATR_TREND_LEN = "atrTrendLen";
+  static final String ATR_TREND_MULT = "atrTrendMult";
+  static final String ATR_SMOOTH = "atrSmooth";
+  static final String ATR_TREND_PATH = "atrTrendPath";
 
-  private static final String BULL_COLOR = "bullColor";
-  private static final String BEAR_COLOR = "bearColor";
-  private static final String OB_BULL_COLOR = "obBullColor";
-  private static final String OB_BEAR_COLOR = "obBearColor";
-  private static final String UP_MARKER = "upMarker";
-  private static final String DOWN_MARKER = "downMarker";
-  private static final String STRUCT_PATH = "structPath";
-  private static final String RISK_PATH = "riskPath";
+  static final String BULL_COLOR = "bullColor";
+  static final String BEAR_COLOR = "bearColor";
+  static final String OB_BULL_COLOR = "obBullColor";
+  static final String OB_BEAR_COLOR = "obBearColor";
+  static final String UP_MARKER = "upMarker";
+  static final String DOWN_MARKER = "downMarker";
+  static final String STRUCT_PATH = "structPath";
+  static final String RISK_PATH = "riskPath";
 
-  private static final String ALERT_SL = "alertSl";
-  private static final String ALERT_TP = "alertTp";
-  private static final String ALERT_OB = "alertOb";
+  static final String ALERT_SL = "alertSl";
+  static final String ALERT_TP = "alertTp";
+  static final String ALERT_OB = "alertOb";
 
   private static final int LINE_FORWARD_BARS = 20;
   private static final int LINE_UPDATE_BARS = 5;
@@ -212,25 +221,6 @@ public class MeridianFlowForge extends Study
   }
 
 
-  private static class OptimizerResult {
-    boolean valid;
-    int candidates;
-    int bars;
-    double score;
-    String objective;
-    String params;
-    String note;
-    BacktestStats stats;
-    SettingsView cfg;
-  }
-
-  private static class OptimizerAccumulator {
-    int candidates;
-    OptimizerResult best;
-    OptimizerResult fallback;
-  }
-
-
   @Override
   public void initialize(Defaults defaults)
   {
@@ -242,6 +232,7 @@ public class MeridianFlowForge extends Study
     sg.addRow(new DiscreteDescriptor(BREAK_SRC, "Break Confirmation", "Close", opts("Close", "Wick")));
     sg.addRow(new DiscreteDescriptor(SIGNAL_MODE, "Signal Mode", "BOS + CHoCH", opts("BOS + CHoCH", "CHoCH only", "BOS only")));
     sg.addRow(new DiscreteDescriptor(SIGNAL_SOURCE, "Confirmed Signal Source", "Structure + Forge", opts("Structure + Forge", "Structure only", "Forge only")));
+    sg.addRow(new DiscreteDescriptor(SIGNAL_GROUP, "Signal Group", "Manual", opts("Manual", "Trend Confirmation", "Momentum Pullback", "Mean Reversion", "Structure Only", "Balanced")));
     sg.addRow(new BooleanDescriptor(SHOW_STRUCT, "Show HH/HL/LH/LL", true));
     sg.addRow(new BooleanDescriptor(SHOW_BOS, "Show BOS/CHoCH", true));
 
@@ -341,12 +332,20 @@ public class MeridianFlowForge extends Study
     optg.addRow(new DiscreteDescriptor(OPT_OBJECTIVE, "Objective", "Balanced",
       opts("Balanced", "Net Points", "Profit Factor", "PF vs Max DD", "Recovery Factor")));
     optg.addRow(new DiscreteDescriptor(OPT_SEARCH, "Search Profile", "NQ 5/15m Fast", opts("NQ 5/15m Fast", "Around Current")));
+    optg.addRow(new DiscreteDescriptor(OPT_REFRESH_MODE, "Refresh Mode", "Every Bar",
+      opts("Every Bar", "Every N Bars", "On Demand")),
+      new IntegerDescriptor(OPT_REFRESH_INTERVAL, "Refresh Every N Bars", 5, 1, 500, 1));
 
     SettingTab visual = sd.addTab("Visual");
     SettingGroup vg = visual.addGroup("Display");
     vg.addRow(new BooleanDescriptor(SHOW_DASHBOARD, "Show Live Backtest Dashboard", true),
       new DiscreteDescriptor(DASHBOARD_MODE, "Dashboard Mode", "Full", opts("Full", "Compact")),
       new BooleanDescriptor(DASHBOARD_HIDE_UNUSED, "Hide Unused Dashboard Items", false));
+    vg.addRow(new DiscreteDescriptor(DASHBOARD_POS_PRESET, "Dashboard Position", "Top Left",
+      opts("Top Left", "Top Right", "Bottom Left", "Bottom Right", "Custom")));
+    vg.addRow(new IntegerDescriptor(DASHBOARD_X_OFFSET, "Dashboard X Offset", 12, 0, 200, 1),
+      new IntegerDescriptor(DASHBOARD_Y_OFFSET, "Dashboard Y Offset", 12, 0, 200, 1));
+    vg.addRow(new IntegerDescriptor(DASHBOARD_SCALE, "Dashboard Width Scale %", 100, 50, 200, 5));
     vg.addRow(new BooleanDescriptor(SHOW_PROJECTION, "Show Next Trade Projection", true),
       new IntegerDescriptor(PROJECTION_BARS, "Projection Bars", 16, 4, 80, 1));
     vg.addRow(new IntegerDescriptor(DASHBOARD_LOOKBACK, "Backtest Lookback Bars", 5000, 100, 50000, 100));
@@ -372,10 +371,10 @@ public class MeridianFlowForge extends Study
     ag.addRow(new BooleanDescriptor(ALERT_TP, "Alert on TP / Break-Even", false));
     ag.addRow(new BooleanDescriptor(ALERT_OB, "Alert on OB Mitigation", false));
 
-    sd.addQuickSettings(SWING_LEN, BREAK_SRC, SIGNAL_SOURCE, SIGNAL_MODE, SHOW_OB, MAX_OB, ENABLE_SMA, ENABLE_ST, ENABLE_TILSON, ENABLE_SMI, USE_HTF, TP_MODE, SHOW_DASHBOARD, DASHBOARD_MODE, SHOW_OPTIMIZER, APPLY_OPTIMIZER, SHOW_PROJECTION);
+    sd.addQuickSettings(SWING_LEN, BREAK_SRC, SIGNAL_SOURCE, SIGNAL_MODE, SIGNAL_GROUP, SHOW_OB, MAX_OB, ENABLE_SMA, ENABLE_ST, ENABLE_TILSON, ENABLE_SMI, USE_HTF, TP_MODE, SHOW_DASHBOARD, DASHBOARD_MODE, SHOW_OPTIMIZER, APPLY_OPTIMIZER, SHOW_PROJECTION);
 
     RuntimeDescriptor rd = createRD();
-    rd.setLabelSettings(SWING_LEN, SIGNAL_SOURCE, SIGNAL_MODE);
+    rd.setLabelSettings(SWING_LEN, SIGNAL_SOURCE, SIGNAL_MODE, SIGNAL_GROUP);
     rd.exportValue(new ValueDescriptor(Values.ATR_TREND, "ATR Trend", ATR_TREND_LEN, ATR_TREND_MULT));
     rd.declarePath(Values.ATR_TREND, ATR_TREND_PATH);
     rd.declareIndicator(Values.ATR_TREND, Inputs.IND);
@@ -408,6 +407,24 @@ public class MeridianFlowForge extends Study
   }
 
   @Override
+  public boolean onClick(Point p, int button) {
+    DashboardFigure fig = lastDashboardFigure;
+    if (fig == null) return false;
+    Rectangle2D bounds = fig.applyBounds();
+    if (bounds == null) return false;
+    if (!bounds.contains(p.x, p.y)) return false;
+
+    SettingsView cfg = lastDashboardCfg;
+    int signalIndex = lastDashboardSignalIndex;
+    if (cfg == null || signalIndex < 0) return false;
+
+    DataContext ctx = getDataContext();
+    DataSeries s = ctx.getDataSeries();
+    optimizer.apply(ctx, s, cfg, signalIndex, getSettings());
+    calculationCacheKey = "";
+    return true;
+  }
+  @Override
   protected void calculateValues(DataContext ctx)
   {
     DataSeries s = ctx.getDataSeries();
@@ -422,8 +439,8 @@ public class MeridianFlowForge extends Study
     cfg.read(getSettings(), ctx);
     int signalIndex = latestCompleteIndex(s);
     if (getSettings().getBoolean(APPLY_OPTIMIZER, false)) {
-      OptimizerResult applied = applyOptimizerRecommendation(ctx, s, cfg, signalIndex);
-      if (applied != null && applied.valid && applied.cfg != null) cfg = applied.cfg;
+      OptimizerResult applied = optimizer.apply(ctx, s, cfg, signalIndex, getSettings());
+      if (applied != null && applied.valid && applied.cfg != null) { cfg = applied.cfg; calculationCacheKey = ""; }
     }
     String calcKey = calculationKey(s, cfg, signalIndex);
     if (calcKey.equals(calculationCacheKey)) return;
@@ -760,175 +777,15 @@ public class MeridianFlowForge extends Study
     if (lastTrade != null && cfg.showRisk) drawTradeLines(s, lastTrade, cfg);
     if (projection != null) drawProjection(s, projection, cfg);
 
-    if (cfg.showDashboard) drawDashboard(ctx, s, cfg, signalIndex, openLongSignals, openShortSignals, atrRisk, rsi, stoch, sar, tilson, smi);
+    if (cfg.showDashboard) {
+      lastDashboardCfg = cfg;
+      lastDashboardSignalIndex = signalIndex;
+      drawDashboard(ctx, s, cfg, signalIndex, openLongSignals, openShortSignals, atrRisk, rsi, stoch, sar, tilson, smi);
+    }
 
     calculationCacheKey = calcKey;
     endFigureUpdate();
   }
-
-  static class SettingsView {
-    int swingLen, obLookback, maxOB;
-    int smaFast, smaSlow, rsiLen, macdFast, macdSlow, macdSignal, stLen;
-    int stochK, stochD, stochSmooth, bbLen, emaFast, emaSlow, cciLen, adxLen, diLen;
-    int tilsonPeriod, smiLongPeriod, smiShortPeriod, smiSignalPeriod;
-    int atrRiskLen, atrTrendLen, atrSmooth, htfEmaLen, obAlpha, dashboardLookback, optimizerLookback, optimizerMinTrades, projectionBars;
-    double rsiLong, rsiShort, stFactor, bbMult, sarStart, sarInc, sarMax, cciLong, cciShort, adxThreshold;
-    double smiTopGuide, smiBottomGuide;
-    double slMultEff, tpEff, tp1Eff, tp2Eff, tp3Eff, atrTrendMult;
-    double slMultRaw, tpMultRaw, tp1MultRaw, tp2MultRaw, tp3MultRaw;
-    boolean breakOnWick, showStruct, showBos, showOB, obMitWick, removeMitigated, obMean, obLabels;
-    boolean useHtf, requireAll, enableSma, enableRsi, enableMacd, enableSt, enableStoch, enableBb, enableEma;
-    boolean enableAo, enableSar, enableCci, enableAdx, enableTilson, enableSmi, showRisk, useBreakEven, showAtrTrend, showDashboard, showOptimizer, showProjection, dashboardCompact, dashboardHideUnused, singleTarget, alertSl, alertTp, alertOb;
-    String signalMode, obFrom, signalSource, riskPreset, optimizerObjective, optimizerSearch, dashboardMode, tpMode;
-    String tilsonInput, tilsonMethod, smiInput, smiMethod, smiMode;
-    BarSize htfBarSize;
-    Color bullColor, bearColor, obBullColor, obBearColor, neutralColor;
-
-    void read(com.motivewave.platform.sdk.common.Settings st, DataContext ctx) {
-      swingLen = st.getInteger(SWING_LEN, 13);
-      breakOnWick = "Wick".equals(st.getString(BREAK_SRC, "Close"));
-      signalMode = st.getString(SIGNAL_MODE, "BOS + CHoCH");
-      signalSource = st.getString(SIGNAL_SOURCE, "Structure + Forge");
-      showStruct = st.getBoolean(SHOW_STRUCT, true);
-      showBos = st.getBoolean(SHOW_BOS, true);
-      showOB = st.getBoolean(SHOW_OB, true);
-      obFrom = st.getString(OB_FROM, "BOS + CHoCH");
-      obMitWick = "Wick".equals(st.getString(OB_MIT_SRC, "Wick"));
-      removeMitigated = st.getBoolean(REMOVE_MIT, false);
-      obLookback = st.getInteger(OB_LOOKBACK, 30);
-      maxOB = st.getInteger(MAX_OB, 8);
-      obAlpha = st.getInteger(OB_ALPHA, 38);
-      obMean = st.getBoolean(OB_MEAN, false);
-      obLabels = st.getBoolean(OB_LABELS, false);
-      useHtf = st.getBoolean(USE_HTF, false);
-      htfBarSize = st.getBarSize(HTF_BAR_SIZE);
-      if (htfBarSize == null) htfBarSize = BarSize.minute(60);
-      htfEmaLen = st.getInteger(HTF_EMA_LEN, 50);
-      requireAll = st.getBoolean(REQUIRE_ALL, true);
-      enableSma = st.getBoolean(ENABLE_SMA, true);
-      smaFast = st.getInteger(SMA_FAST, 10);
-      smaSlow = st.getInteger(SMA_SLOW, 20);
-      enableRsi = st.getBoolean(ENABLE_RSI, false);
-      rsiLen = st.getInteger(RSI_LEN, 14);
-      rsiLong = st.getDouble(RSI_LONG, 50);
-      rsiShort = st.getDouble(RSI_SHORT, 50);
-      enableMacd = st.getBoolean(ENABLE_MACD, false);
-      macdFast = st.getInteger(MACD_FAST, 12);
-      macdSlow = st.getInteger(MACD_SLOW, 26);
-      macdSignal = st.getInteger(MACD_SIGNAL, 9);
-      enableSt = st.getBoolean(ENABLE_ST, false);
-      stFactor = st.getDouble(ST_FACTOR, 3.0);
-      stLen = st.getInteger(ST_LEN, 10);
-      enableStoch = st.getBoolean(ENABLE_STOCH, false);
-      stochK = st.getInteger(STOCH_K, 14);
-      stochD = st.getInteger(STOCH_D, 3);
-      stochSmooth = st.getInteger(STOCH_SMOOTH, 3);
-      enableBb = st.getBoolean(ENABLE_BB, false);
-      bbLen = st.getInteger(BB_LEN, 20);
-      bbMult = st.getDouble(BB_MULT, 2.0);
-      enableEma = st.getBoolean(ENABLE_EMA, false);
-      emaFast = st.getInteger(EMA_FAST, 10);
-      emaSlow = st.getInteger(EMA_SLOW, 20);
-      enableAo = st.getBoolean(ENABLE_AO, false);
-      enableSar = st.getBoolean(ENABLE_SAR, false);
-      sarStart = st.getDouble(SAR_START, 0.02);
-      sarInc = st.getDouble(SAR_INC, 0.02);
-      sarMax = st.getDouble(SAR_MAX, 0.2);
-      enableCci = st.getBoolean(ENABLE_CCI, false);
-      cciLen = st.getInteger(CCI_LEN, 20);
-      cciLong = st.getDouble(CCI_LONG, 0);
-      cciShort = st.getDouble(CCI_SHORT, 0);
-      enableAdx = st.getBoolean(ENABLE_ADX, false);
-      adxLen = st.getInteger(ADX_LEN, 14);
-      diLen = st.getInteger(DI_LEN, 14);
-      adxThreshold = st.getDouble(ADX_THRESHOLD, 20);
-      enableTilson = st.getBoolean(ENABLE_TILSON, false);
-      tilsonInput = st.getString(TILSON_INPUT, "High");
-      tilsonMethod = st.getString(TILSON_METHOD, "MEMA");
-      tilsonPeriod = st.getInteger(TILSON_PERIOD, 12);
-      enableSmi = st.getBoolean(ENABLE_SMI, false);
-      smiInput = st.getString(SMI_INPUT, "Open");
-      smiMethod = st.getString(SMI_METHOD, "SMA");
-      smiLongPeriod = st.getInteger(SMI_LONG_PERIOD, 10);
-      smiShortPeriod = st.getInteger(SMI_SHORT_PERIOD, 12);
-      smiSignalPeriod = st.getInteger(SMI_SIGNAL_PERIOD, 6);
-      smiTopGuide = st.getDouble(SMI_TOP_GUIDE, 0.1);
-      smiBottomGuide = st.getDouble(SMI_BOTTOM_GUIDE, -0.1);
-      smiMode = st.getString(SMI_MODE, "Line vs Signal");
-      atrRiskLen = st.getInteger(ATR_RISK_LEN, 13);
-      slMultRaw = st.getDouble(SL_MULT, 1.5);
-      tpMultRaw = st.getDouble(TP_MULT, 2.0);
-      tp1MultRaw = st.getDouble(TP1_MULT, 1.0);
-      tp2MultRaw = st.getDouble(TP2_MULT, 2.0);
-      tp3MultRaw = st.getDouble(TP3_MULT, 3.0);
-      riskPreset = st.getString(RISK_PRESET, "Balanced");
-      tpMode = st.getString(TP_MODE, "Three Targets");
-      singleTarget = "Single Target".equals(tpMode);
-
-      switch (riskPreset) {
-        case "Conservative" -> { slMultEff = 2.5; tpEff = 2.0; tp1Eff = 1.0; tp2Eff = 2.0; tp3Eff = 4.0; }
-        case "Aggressive" -> { slMultEff = 1.0; tpEff = 2.5; tp1Eff = 1.5; tp2Eff = 2.5; tp3Eff = 4.0; }
-        case "Scalping" -> { slMultEff = 0.8; tpEff = 1.5; tp1Eff = 0.8; tp2Eff = 1.5; tp3Eff = 2.0; }
-        case "Custom" -> { slMultEff = slMultRaw; tpEff = tpMultRaw; tp1Eff = tp1MultRaw; tp2Eff = tp2MultRaw; tp3Eff = tp3MultRaw; }
-        default -> { slMultEff = 1.5; tpEff = 2.0; tp1Eff = 1.0; tp2Eff = 2.0; tp3Eff = 3.0; }
-      }
-      if (!singleTarget) {
-        if (tp1Eff >= tp2Eff) tp2Eff = tp1Eff + 0.5;
-        if (tp2Eff >= tp3Eff) tp3Eff = tp2Eff + 0.5;
-      }
-      showRisk = st.getBoolean(SHOW_RISK, true);
-      useBreakEven = st.getBoolean(USE_BE, true);
-      showAtrTrend = st.getBoolean(SHOW_ATR_TREND, true);
-      showDashboard = st.getBoolean(SHOW_DASHBOARD, true);
-      dashboardMode = st.getString(DASHBOARD_MODE, "Full");
-      dashboardCompact = "Compact".equals(dashboardMode);
-      dashboardHideUnused = st.getBoolean(DASHBOARD_HIDE_UNUSED, false);
-      showProjection = st.getBoolean(SHOW_PROJECTION, true);
-      projectionBars = st.getInteger(PROJECTION_BARS, 16);
-      showOptimizer = st.getBoolean(SHOW_OPTIMIZER, false);
-      optimizerLookback = st.getInteger(OPT_LOOKBACK, 2500);
-      optimizerMinTrades = st.getInteger(OPT_MIN_TRADES, 8);
-      optimizerObjective = st.getString(OPT_OBJECTIVE, "Balanced");
-      optimizerSearch = st.getString(OPT_SEARCH, "NQ 5/15m Fast");
-      dashboardLookback = st.getInteger(DASHBOARD_LOOKBACK, 5000);
-      atrTrendLen = st.getInteger(ATR_TREND_LEN, 10);
-      atrTrendMult = st.getDouble(ATR_TREND_MULT, 5.0);
-      atrSmooth = st.getInteger(ATR_SMOOTH, 5);
-      Defaults d = ctx.getDefaults();
-      bullColor = st.getColor(BULL_COLOR, d == null ? new Color(0, 230, 118) : d.getGreen());
-      bearColor = st.getColor(BEAR_COLOR, d == null ? new Color(255, 82, 82) : d.getRed());
-      obBullColor = st.getColor(OB_BULL_COLOR, new Color(38, 166, 154));
-      obBearColor = st.getColor(OB_BEAR_COLOR, new Color(239, 83, 80));
-      neutralColor = new Color(245, 180, 40);
-      alertSl = st.getBoolean(ALERT_SL, true);
-      alertTp = st.getBoolean(ALERT_TP, false);
-      alertOb = st.getBoolean(ALERT_OB, false);
-    }
-
-    SettingsView copy() {
-      SettingsView c = new SettingsView();
-      c.swingLen = swingLen; c.obLookback = obLookback; c.maxOB = maxOB;
-      c.smaFast = smaFast; c.smaSlow = smaSlow; c.rsiLen = rsiLen; c.macdFast = macdFast; c.macdSlow = macdSlow; c.macdSignal = macdSignal; c.stLen = stLen;
-      c.stochK = stochK; c.stochD = stochD; c.stochSmooth = stochSmooth; c.bbLen = bbLen; c.emaFast = emaFast; c.emaSlow = emaSlow; c.cciLen = cciLen; c.adxLen = adxLen; c.diLen = diLen;
-      c.tilsonPeriod = tilsonPeriod; c.smiLongPeriod = smiLongPeriod; c.smiShortPeriod = smiShortPeriod; c.smiSignalPeriod = smiSignalPeriod;
-      c.atrRiskLen = atrRiskLen; c.atrTrendLen = atrTrendLen; c.atrSmooth = atrSmooth; c.htfEmaLen = htfEmaLen; c.obAlpha = obAlpha; c.dashboardLookback = dashboardLookback;
-      c.optimizerLookback = optimizerLookback; c.optimizerMinTrades = optimizerMinTrades; c.projectionBars = projectionBars;
-      c.rsiLong = rsiLong; c.rsiShort = rsiShort; c.stFactor = stFactor; c.bbMult = bbMult; c.sarStart = sarStart; c.sarInc = sarInc; c.sarMax = sarMax; c.cciLong = cciLong; c.cciShort = cciShort; c.adxThreshold = adxThreshold;
-      c.smiTopGuide = smiTopGuide; c.smiBottomGuide = smiBottomGuide;
-      c.slMultEff = slMultEff; c.tpEff = tpEff; c.tp1Eff = tp1Eff; c.tp2Eff = tp2Eff; c.tp3Eff = tp3Eff; c.atrTrendMult = atrTrendMult;
-      c.slMultRaw = slMultRaw; c.tpMultRaw = tpMultRaw; c.tp1MultRaw = tp1MultRaw; c.tp2MultRaw = tp2MultRaw; c.tp3MultRaw = tp3MultRaw;
-      c.breakOnWick = breakOnWick; c.showStruct = showStruct; c.showBos = showBos; c.showOB = showOB; c.obMitWick = obMitWick; c.removeMitigated = removeMitigated; c.obMean = obMean; c.obLabels = obLabels;
-      c.useHtf = useHtf; c.requireAll = requireAll; c.enableSma = enableSma; c.enableRsi = enableRsi; c.enableMacd = enableMacd; c.enableSt = enableSt; c.enableStoch = enableStoch; c.enableBb = enableBb; c.enableEma = enableEma;
-      c.enableAo = enableAo; c.enableSar = enableSar; c.enableCci = enableCci; c.enableAdx = enableAdx; c.enableTilson = enableTilson; c.enableSmi = enableSmi; c.showRisk = showRisk; c.useBreakEven = useBreakEven; c.showAtrTrend = showAtrTrend; c.showDashboard = showDashboard; c.showOptimizer = showOptimizer; c.showProjection = showProjection; c.dashboardCompact = dashboardCompact; c.dashboardHideUnused = dashboardHideUnused; c.singleTarget = singleTarget;
-      c.alertSl = alertSl; c.alertTp = alertTp; c.alertOb = alertOb;
-      c.signalMode = signalMode; c.obFrom = obFrom; c.signalSource = signalSource; c.riskPreset = riskPreset; c.optimizerObjective = optimizerObjective; c.optimizerSearch = optimizerSearch; c.dashboardMode = dashboardMode; c.tpMode = tpMode;
-      c.tilsonInput = tilsonInput; c.tilsonMethod = tilsonMethod; c.smiInput = smiInput; c.smiMethod = smiMethod; c.smiMode = smiMode;
-      c.htfBarSize = htfBarSize;
-      c.bullColor = bullColor; c.bearColor = bearColor; c.obBullColor = obBullColor; c.obBearColor = obBearColor; c.neutralColor = neutralColor;
-      return c;
-    }
-  }
-
 
   private void drawEvent(DataSeries s, FigureEvent e) {
     if (e.x1 < 0 || e.x1 >= s.size()) return;
@@ -1075,21 +932,22 @@ public class MeridianFlowForge extends Study
   private void drawDashboard(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex, boolean[] longSignals, boolean[] shortSignals,
                              double[] atrRisk, double[] rsi, Stoch stoch, Sar sar, Tilson tilson, Smi smi) {
     if (signalIndex < 0 || signalIndex >= s.size()) return;
-    BacktestStats stats = runBacktest(s, cfg, signalIndex, longSignals, shortSignals, atrRisk, cfg.dashboardLookback);
-    OptimizerResult opt = cfg.showOptimizer ? getOptimizerResult(ctx, s, cfg, signalIndex) : null;
+    BacktestStats stats = MeridianBacktest.runBacktest(s, cfg, signalIndex, longSignals, shortSignals, atrRisk, cfg.dashboardLookback);
+    OptimizerResult opt = cfg.showOptimizer ? optimizer.getResult(ctx, s, cfg, signalIndex) : null;
     int bars = Math.min(cfg.dashboardLookback, signalIndex + 1);
     String signal = longSignals[signalIndex] ? "LONG" : shortSignals[signalIndex] ? "SHORT" : "NEUTRAL";
     Color signalColor = longSignals[signalIndex] ? cfg.bullColor : shortSignals[signalIndex] ? cfg.bearColor : cfg.neutralColor;
     double winRate = stats.trades == 0 ? 0.0 : 100.0 * stats.wins / stats.trades;
-    double profitFactor = profitFactor(stats);
-    double netProfitFactor = netProfitFactor(stats);
-    double recoveryFactor = recoveryFactor(stats);
+    double profitFactor = MeridianBacktest.profitFactor(stats);
+    double netProfitFactor = MeridianBacktest.netProfitFactor(stats);
+    double recoveryFactor = MeridianBacktest.recoveryFactor(stats);
     boolean optStale = opt != null && opt.valid && opt.cfg != null && !sameTuning(cfg, opt.cfg);
     DashboardRow[] rows = new DashboardRow[40];
     int row = 0;
     if (cfg.dashboardCompact) {
       rows[row++] = headerRow("MF", VERSION, signal, signalColor);
       rows[row++] = dashRow("Sig", signal, enabledCount(cfg) + "F " + (cfg.requireAll ? "ALL" : "ANY"), signalColor);
+      rows[row++] = dashRow("Grp", cfg.signalGroup, "Manual".equals(cfg.signalGroup) ? cfg.signalSource : signalGroupRegime(cfg), DashboardFigure.ACCENT);
       rows[row++] = dashRow("BT", bars + "b/" + stats.trades + "t", formatPct(winRate) + " WR", DashboardFigure.TEXT);
       rows[row++] = dashRow("PF", formatRatio(profitFactor), "NPF " + formatRatio(netProfitFactor), ratioColor(profitFactor, 1.0));
       rows[row++] = dashRow("Net", formatSigned(stats.netPoints), "DD " + formatPoints(stats.maxDrawdownPoints), signedColor(stats.netPoints));
@@ -1097,12 +955,13 @@ public class MeridianFlowForge extends Study
       if (opt != null && opt.stats != null) {
         rows[row++] = headerRow("Opt", opt.objective, opt.valid ? opt.candidates + "x" : "low trades", opt.valid ? DashboardFigure.GOOD : DashboardFigure.WARN);
         rows[row++] = dashRow("Rec", parameterSummaryRisk(opt.cfg), optStale ? "APPLY" : "OK", optStale ? DashboardFigure.WARN : DashboardFigure.GOOD);
-        rows[row++] = dashRow("Perf", formatSigned(opt.stats.netPoints), "PF " + formatRatio(profitFactor(opt.stats)) + " DD " + formatPoints(opt.stats.maxDrawdownPoints), signedColor(opt.stats.netPoints));
+        rows[row++] = dashRow("Perf", formatSigned(opt.stats.netPoints), "PF " + formatRatio(MeridianBacktest.profitFactor(opt.stats)) + " DD " + formatPoints(opt.stats.maxDrawdownPoints), signedColor(opt.stats.netPoints));
       }
     }
     else {
       rows[row++] = headerRow("Meridian Forge", VERSION, signal, signalColor);
       rows[row++] = dashRow("Signal", signal, enabledCount(cfg) + " filters • " + (cfg.requireAll ? "ALL" : "ANY"), signalColor);
+      rows[row++] = dashRow("Signal Group", cfg.signalGroup, "Manual".equals(cfg.signalGroup) ? cfg.signalSource : signalGroupRegime(cfg), DashboardFigure.ACCENT);
       rows[row++] = dashRow("Core filters", coreFilterSnapshot(cfg, signalIndex, s.getClose(signalIndex), rsi, stoch, sar), "", DashboardFigure.TEXT);
       rows[row++] = dashRow("Strategy filters", strategyFilterSnapshot(cfg, signalIndex, tilson, smi), "", DashboardFigure.TEXT);
       rows[row++] = dashRow("Target mode", cfg.singleTarget ? "Single target" : "Three targets", parameterSummaryRisk(cfg), DashboardFigure.TEXT);
@@ -1115,7 +974,7 @@ public class MeridianFlowForge extends Study
       if (opt != null && opt.stats != null) {
         rows[row++] = headerRow("Optimizer", opt.objective, opt.valid ? opt.candidates + " tries" : "below min trades", opt.valid ? DashboardFigure.GOOD : DashboardFigure.WARN);
         rows[row++] = dashRow("Apply status", optStale ? "REC OUT OF DATE" : "Current matches rec", optStale ? "tick Apply Optimizer" : "", optStale ? DashboardFigure.WARN : DashboardFigure.GOOD);
-        rows[row++] = dashRow("Opt stats", formatSigned(opt.stats.netPoints), "PF " + formatRatio(profitFactor(opt.stats)) + " • DD " + formatPoints(opt.stats.maxDrawdownPoints) + " • RF " + formatRatio(recoveryFactor(opt.stats)), signedColor(opt.stats.netPoints));
+        rows[row++] = dashRow("Opt stats", formatSigned(opt.stats.netPoints), "PF " + formatRatio(MeridianBacktest.profitFactor(opt.stats)) + " • DD " + formatPoints(opt.stats.maxDrawdownPoints) + " • RF " + formatRatio(MeridianBacktest.recoveryFactor(opt.stats)), signedColor(opt.stats.netPoints));
         rows[row++] = dashRow("Opt core", parameterSummaryCore(opt.cfg), opt.note == null ? "" : opt.note, DashboardFigure.ACCENT);
         rows[row++] = dashRow("Opt risk", parameterSummaryRisk(opt.cfg), "", DashboardFigure.ACCENT);
         String filters = parameterSummaryFilters(opt.cfg, cfg.dashboardHideUnused);
@@ -1126,7 +985,8 @@ public class MeridianFlowForge extends Study
       rows[row++] = dashRow(cfg.dashboardCompact ? "Open" : "Open trade", stats.activeDir > 0 ? "LONG " + formatPrice(stats.activeEntry) : "SHORT " + formatPrice(stats.activeEntry),
         "UPL " + formatSigned(stats.activeUnrealized), signedColor(stats.activeUnrealized));
     }
-    addFigure(new DashboardFigure(rows, row, cfg.dashboardCompact));
+    lastDashboardFigure = new DashboardFigure(rows, row, cfg.dashboardCompact, cfg.dashboardPosPreset, cfg.dashboardXOffset, cfg.dashboardYOffset, cfg.dashboardScale / 100.0, optStale);
+    addFigure(lastDashboardFigure);
   }
 
   private static DashboardRow headerRow(String label, String value, String extra, Color color) {
@@ -1137,614 +997,9 @@ public class MeridianFlowForge extends Study
     return new DashboardRow(label, value, extra, color, false);
   }
 
-
-  private static BacktestStats runBacktest(DataSeries s, SettingsView cfg, int signalIndex, boolean[] longSignals, boolean[] shortSignals,
-                                           double[] atrRisk, int lookbackBars) {
-    BacktestStats stats = new BacktestStats();
-    int start = Math.max(0, signalIndex - Math.max(1, lookbackBars) + 1);
-    int activeDir = 0;
-    int entryIndex = -1;
-    double entry = Double.NaN;
-    double sl = Double.NaN;
-    double tp1 = Double.NaN;
-    double tp2 = Double.NaN;
-    double tp3 = Double.NaN;
-    boolean tp1Reached = false;
-    boolean tp2Reached = false;
-    for (int i = start; i <= signalIndex && i < s.size(); i++) {
-      if (!s.isBarComplete(i)) continue;
-      if (activeDir != 0 && i > entryIndex) {
-        double adverse = activeDir == 1 ? s.getLow(i) : s.getHigh(i);
-        updateDrawdown(stats, stats.netPoints + activeDir * (adverse - entry));
-        boolean slHit = activeDir == 1 ? s.getLow(i) <= sl : s.getHigh(i) >= sl;
-        boolean tp1Hit = !Double.isNaN(tp1) && (activeDir == 1 ? s.getHigh(i) >= tp1 : s.getLow(i) <= tp1);
-        boolean tp2Hit = !Double.isNaN(tp2) && (activeDir == 1 ? s.getHigh(i) >= tp2 : s.getLow(i) <= tp2);
-        boolean tp3Hit = !Double.isNaN(tp3) && (activeDir == 1 ? s.getHigh(i) >= tp3 : s.getLow(i) <= tp3);
-        boolean tp1First = targetHitBeforeStop(slHit, tp1Hit) && !tp1Reached;
-        boolean tp2First = targetHitBeforeStop(slHit, tp2Hit) && !tp2Reached;
-        boolean finalTargetFirst = targetHitBeforeStop(slHit, cfg.singleTarget ? tp1Hit : tp3Hit);
-        if (slHit) {
-          boolean beStop = Math.abs(sl - entry) < 0.0000001;
-          closeBacktestTrade(stats, activeDir, entry, sl);
-          if (!beStop) stats.stops++;
-          activeDir = 0;
-          entryIndex = -1;
-          continue;
-        }
-        if (tp1First) {
-          stats.tp1Hits++;
-          tp1Reached = true;
-          if (!cfg.singleTarget && cfg.useBreakEven) sl = entry;
-        }
-        if (!cfg.singleTarget && tp2First) {
-          stats.tp2Hits++;
-          tp2Reached = true;
-        }
-        if (finalTargetFirst) {
-          if (!cfg.singleTarget) stats.tp3Hits++;
-          closeBacktestTrade(stats, activeDir, entry, cfg.singleTarget ? tp1 : tp3);
-          activeDir = 0;
-          entryIndex = -1;
-          continue;
-        }
-      }
-      if (activeDir == 0) {
-        double risk = nz(atrRisk[i]) * cfg.slMultEff;
-        if (risk <= 0) continue;
-        boolean goLong = longSignals[i];
-        boolean goShort = !goLong && shortSignals[i];
-        if (!goLong && !goShort) continue;
-        activeDir = goLong ? 1 : -1;
-        entryIndex = i;
-        entry = s.getClose(i);
-        sl = entry - activeDir * risk;
-        tp1 = entry + activeDir * risk * (cfg.singleTarget ? cfg.tpEff : cfg.tp1Eff);
-        tp2 = cfg.singleTarget ? Double.NaN : entry + activeDir * risk * cfg.tp2Eff;
-        tp3 = cfg.singleTarget ? Double.NaN : entry + activeDir * risk * cfg.tp3Eff;
-        tp1Reached = false;
-        tp2Reached = false;
-      }
-    }
-    if (activeDir != 0) {
-      stats.activeDir = activeDir;
-      stats.activeEntry = entry;
-      stats.activeUnrealized = activeDir * (s.getClose(signalIndex) - entry);
-    }
-    return stats;
-  }
-
-  private OptimizerResult getOptimizerResult(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex) {
-    String key = optimizerKey(s, cfg, signalIndex);
-    if (optimizerCache != null && key.equals(optimizerCacheKey)) return optimizerCache;
-    optimizerCache = runOptimizer(ctx, s, cfg, signalIndex);
-    optimizerCacheKey = key;
-    return optimizerCache;
-  }
-  private OptimizerResult applyOptimizerRecommendation(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex) {
-    OptimizerResult opt = getOptimizerResult(ctx, s, cfg, signalIndex);
-    com.motivewave.platform.sdk.common.Settings st = getSettings();
-    st.setBoolean(APPLY_OPTIMIZER, false);
-    if (opt == null || !opt.valid || opt.cfg == null) return null;
-    applyOptimizerSettings(st, opt.cfg);
-    optimizerCache = null;
-    optimizerCacheKey = "";
-    calculationCacheKey = "";
-    return opt;
-  }
-
-  private static void applyOptimizerSettings(com.motivewave.platform.sdk.common.Settings st, SettingsView c) {
-    st.setInteger(SWING_LEN, c.swingLen);
-    st.setString(SIGNAL_MODE, c.signalMode);
-    st.setString(SIGNAL_SOURCE, c.signalSource);
-    st.setString(RISK_PRESET, c.riskPreset);
-    st.setString(TP_MODE, c.tpMode);
-    st.setInteger(ATR_RISK_LEN, c.atrRiskLen);
-    if ("Custom".equals(c.riskPreset)) {
-      st.setDouble(SL_MULT, c.slMultEff);
-      st.setDouble(TP_MULT, c.tpEff);
-      st.setDouble(TP1_MULT, c.tp1Eff);
-      st.setDouble(TP2_MULT, c.tp2Eff);
-      st.setDouble(TP3_MULT, c.tp3Eff);
-    }
-    st.setBoolean(USE_BE, c.useBreakEven);
-    st.setBoolean(REQUIRE_ALL, c.requireAll);
-    st.setBoolean(ENABLE_SMA, c.enableSma);
-    st.setInteger(SMA_FAST, c.smaFast);
-    st.setInteger(SMA_SLOW, c.smaSlow);
-    st.setBoolean(ENABLE_RSI, c.enableRsi);
-    st.setInteger(RSI_LEN, c.rsiLen);
-    st.setDouble(RSI_LONG, c.rsiLong);
-    st.setDouble(RSI_SHORT, c.rsiShort);
-    st.setBoolean(ENABLE_MACD, c.enableMacd);
-    st.setInteger(MACD_FAST, c.macdFast);
-    st.setInteger(MACD_SLOW, c.macdSlow);
-    st.setInteger(MACD_SIGNAL, c.macdSignal);
-    st.setBoolean(ENABLE_ST, c.enableSt);
-    st.setInteger(ST_LEN, c.stLen);
-    st.setDouble(ST_FACTOR, c.stFactor);
-    st.setBoolean(ENABLE_STOCH, c.enableStoch);
-    st.setInteger(STOCH_K, c.stochK);
-    st.setInteger(STOCH_D, c.stochD);
-    st.setInteger(STOCH_SMOOTH, c.stochSmooth);
-    st.setBoolean(ENABLE_SAR, c.enableSar);
-    st.setDouble(SAR_START, c.sarStart);
-    st.setDouble(SAR_INC, c.sarInc);
-    st.setDouble(SAR_MAX, c.sarMax);
-    st.setBoolean(ENABLE_TILSON, c.enableTilson);
-    st.setString(TILSON_INPUT, c.tilsonInput);
-    st.setString(TILSON_METHOD, c.tilsonMethod);
-    st.setInteger(TILSON_PERIOD, c.tilsonPeriod);
-    st.setBoolean(ENABLE_SMI, c.enableSmi);
-    st.setString(SMI_INPUT, c.smiInput);
-    st.setString(SMI_METHOD, c.smiMethod);
-    st.setString(SMI_MODE, c.smiMode);
-    st.setInteger(SMI_LONG_PERIOD, c.smiLongPeriod);
-    st.setInteger(SMI_SHORT_PERIOD, c.smiShortPeriod);
-    st.setInteger(SMI_SIGNAL_PERIOD, c.smiSignalPeriod);
-  }
-
-  private OptimizerResult runOptimizer(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex) {
-    OptimizerAccumulator acc = new OptimizerAccumulator();
-    SettingsView seed = cfg.copy();
-    considerOptimizerCandidate(acc, ctx, s, seed, signalIndex);
-
-    int passes = "Around Current".equals(cfg.optimizerSearch) ? 1 : 2;
-    for (int pass = 0; pass < passes && acc.candidates < MAX_OPTIMIZER_CANDIDATES; pass++) {
-      SettingsView anchor = acc.best == null ? seed : acc.best.cfg;
-      scanRisk(acc, ctx, s, anchor, signalIndex);
-      scanSwing(acc, ctx, s, anchor, signalIndex);
-      scanSma(acc, ctx, s, anchor, signalIndex);
-      scanRsi(acc, ctx, s, anchor, signalIndex);
-      scanStoch(acc, ctx, s, anchor, signalIndex);
-      scanSar(acc, ctx, s, anchor, signalIndex);
-      scanTilson(acc, ctx, s, anchor, signalIndex);
-      scanSmi(acc, ctx, s, anchor, signalIndex);
-    }
-
-    OptimizerResult out = acc.best == null ? acc.fallback : acc.best;
-    if (out == null) {
-      out = new OptimizerResult();
-      out.valid = false;
-      out.note = "no positive candidates";
-      out.stats = null;
-      out.params = "-";
-      out.objective = cfg.optimizerObjective;
-    }
-    out.candidates = acc.candidates;
-    out.bars = Math.min(cfg.optimizerLookback, signalIndex + 1);
-    out.objective = cfg.optimizerObjective;
-    return out;
-  }
-
-  private void scanSwing(OptimizerAccumulator acc, DataContext ctx, DataSeries s, SettingsView anchor, int signalIndex) {
-    int[] values = uniqueInts(new int[] {anchor.swingLen - 6, anchor.swingLen - 4, anchor.swingLen - 2, anchor.swingLen,
-      anchor.swingLen + 2, anchor.swingLen + 4, anchor.swingLen + 6, 8, 13, 21}, 2, 50);
-    for (int value : values) {
-      if (acc.candidates >= MAX_OPTIMIZER_CANDIDATES) return;
-      SettingsView c = anchor.copy();
-      c.swingLen = value;
-      considerOptimizerCandidate(acc, ctx, s, c, signalIndex);
-    }
-  }
-
-  private void scanSma(OptimizerAccumulator acc, DataContext ctx, DataSeries s, SettingsView anchor, int signalIndex) {
-    if (!anchor.enableSma) return;
-    int[] fasts = uniqueInts(new int[] {anchor.smaFast - 5, anchor.smaFast - 3, anchor.smaFast, anchor.smaFast + 3,
-      anchor.smaFast + 5, 5, 8, 10, 13}, 1, 300);
-    int[] slows = uniqueInts(new int[] {anchor.smaSlow - 10, anchor.smaSlow - 5, anchor.smaSlow, anchor.smaSlow + 5,
-      anchor.smaSlow + 10, 20, 34, 50}, 2, 300);
-    for (int fast : fasts) {
-      for (int slow : slows) {
-        if (acc.candidates >= MAX_OPTIMIZER_CANDIDATES) return;
-        if (fast >= slow) continue;
-        SettingsView c = anchor.copy();
-        c.smaFast = fast;
-        c.smaSlow = slow;
-        considerOptimizerCandidate(acc, ctx, s, c, signalIndex);
-      }
-    }
-  }
-
-  private void scanRsi(OptimizerAccumulator acc, DataContext ctx, DataSeries s, SettingsView anchor, int signalIndex) {
-    if (!anchor.enableRsi) return;
-    int[] lens = uniqueInts(new int[] {anchor.rsiLen - 6, anchor.rsiLen - 3, anchor.rsiLen, anchor.rsiLen + 3,
-      anchor.rsiLen + 6, 9, 14, 21}, 1, 200);
-    double[] longs = uniqueDoubles(new double[] {anchor.rsiLong - 5.0, anchor.rsiLong, anchor.rsiLong + 5.0, 50.0, 55.0, 60.0}, 1.0, 99.0);
-    double[] shorts = uniqueDoubles(new double[] {anchor.rsiShort - 5.0, anchor.rsiShort, anchor.rsiShort + 5.0, 40.0, 45.0, 50.0}, 1.0, 99.0);
-    for (int len : lens) {
-      for (double longLevel : longs) {
-        for (double shortLevel : shorts) {
-          if (acc.candidates >= MAX_OPTIMIZER_CANDIDATES) return;
-          if (shortLevel > longLevel) continue;
-          SettingsView c = anchor.copy();
-          c.rsiLen = len;
-          c.rsiLong = longLevel;
-          c.rsiShort = shortLevel;
-          considerOptimizerCandidate(acc, ctx, s, c, signalIndex);
-        }
-      }
-    }
-  }
-
-  private void scanStoch(OptimizerAccumulator acc, DataContext ctx, DataSeries s, SettingsView anchor, int signalIndex) {
-    if (!anchor.enableStoch) return;
-    int[] ks = uniqueInts(new int[] {anchor.stochK - 5, anchor.stochK, anchor.stochK + 5, 9, 14, 21}, 1, 200);
-    int[] ds = uniqueInts(new int[] {anchor.stochD, 3, 5, 8}, 1, 50);
-    int[] smooths = uniqueInts(new int[] {anchor.stochSmooth, 3, 5, 8}, 1, 50);
-    for (int k : ks) {
-      for (int d : ds) {
-        for (int smooth : smooths) {
-          if (acc.candidates >= MAX_OPTIMIZER_CANDIDATES) return;
-          SettingsView c = anchor.copy();
-          c.stochK = k;
-          c.stochD = d;
-          c.stochSmooth = smooth;
-          considerOptimizerCandidate(acc, ctx, s, c, signalIndex);
-        }
-      }
-    }
-  }
-
-  private void scanSar(OptimizerAccumulator acc, DataContext ctx, DataSeries s, SettingsView anchor, int signalIndex) {
-    if (!anchor.enableSar) return;
-    double[] starts = uniqueDoubles(new double[] {anchor.sarStart, 0.01, 0.02, 0.03, 0.04}, 0.001, 1.0);
-    double[] incs = uniqueDoubles(new double[] {anchor.sarInc, 0.01, 0.02, 0.03, 0.04}, 0.001, 1.0);
-    double[] maxes = uniqueDoubles(new double[] {anchor.sarMax, 0.10, 0.20, 0.30, 0.40}, 0.01, 2.0);
-    for (double start : starts) {
-      for (double inc : incs) {
-        for (double max : maxes) {
-          if (acc.candidates >= MAX_OPTIMIZER_CANDIDATES) return;
-          if (start > max || inc > max) continue;
-          SettingsView c = anchor.copy();
-          c.sarStart = start;
-          c.sarInc = inc;
-          c.sarMax = max;
-          considerOptimizerCandidate(acc, ctx, s, c, signalIndex);
-        }
-      }
-    }
-  }
-  private void scanTilson(OptimizerAccumulator acc, DataContext ctx, DataSeries s, SettingsView anchor, int signalIndex) {
-    if (!anchor.enableTilson) return;
-    int[] periods = uniqueInts(new int[] {anchor.tilsonPeriod - 3, anchor.tilsonPeriod - 1, anchor.tilsonPeriod,
-      anchor.tilsonPeriod + 1, anchor.tilsonPeriod + 3, 7, 9, 10, 12}, 2, 200);
-    String[] inputs = uniqueStrings(anchor.tilsonInput, "High", "Close", "Open");
-    String[] methods = uniqueStrings(anchor.tilsonMethod, "MEMA", "SMA", "EMA");
-    for (String input : inputs) {
-      for (String method : methods) {
-        for (int period : periods) {
-          if (acc.candidates >= MAX_OPTIMIZER_CANDIDATES) return;
-          SettingsView c = anchor.copy();
-          c.tilsonInput = input;
-          c.tilsonMethod = method;
-          c.tilsonPeriod = period;
-          considerOptimizerCandidate(acc, ctx, s, c, signalIndex);
-        }
-      }
-    }
-  }
-
-
-  private void scanSmi(OptimizerAccumulator acc, DataContext ctx, DataSeries s, SettingsView anchor, int signalIndex) {
-    if (!anchor.enableSmi) return;
-    int[][] profiles = new int[][] {
-      {anchor.smiLongPeriod, anchor.smiShortPeriod, anchor.smiSignalPeriod},
-      {10, 12, 6},
-      {12, 9, 7},
-      {5, 11, 11},
-      {11, 5, 11},
-      {7, 11, 7},
-      {14, 5, 5}
-    };
-    String[] inputs = uniqueStrings(anchor.smiInput, "Open", "Close");
-    String[] methods = uniqueStrings(anchor.smiMethod, "SMA", "EMA", "MEMA");
-    String[] modes = uniqueStrings(anchor.smiMode, "Line vs Signal", "Zero Bias");
-    for (String input : inputs) {
-      for (String method : methods) {
-        for (String mode : modes) {
-          for (int[] profile : profiles) {
-            if (acc.candidates >= MAX_OPTIMIZER_CANDIDATES) return;
-            SettingsView c = anchor.copy();
-            c.smiInput = input;
-            c.smiMethod = method;
-            c.smiMode = mode;
-            c.smiLongPeriod = profile[0];
-            c.smiShortPeriod = profile[1];
-            c.smiSignalPeriod = profile[2];
-            considerOptimizerCandidate(acc, ctx, s, c, signalIndex);
-          }
-        }
-      }
-    }
-  }
-
-  private void scanRisk(OptimizerAccumulator acc, DataContext ctx, DataSeries s, SettingsView anchor, int signalIndex) {
-    double[][] profiles = new double[][] {
-      {anchor.atrRiskLen, anchor.slMultEff, anchor.tpEff, anchor.tp1Eff, anchor.tp2Eff, anchor.tp3Eff},
-      {8.0, 0.8, 1.5, 0.8, 1.5, 2.0},
-      {10.0, 1.0, 2.0, 1.0, 2.0, 3.0},
-      {13.0, 1.0, 2.5, 1.5, 2.5, 4.0},
-      {13.0, 1.5, 2.0, 1.0, 2.0, 3.0},
-      {20.0, 2.0, 2.0, 1.0, 2.0, 4.0}
-    };
-    for (double[] profile : profiles) {
-      if (acc.candidates >= MAX_OPTIMIZER_CANDIDATES) return;
-      SettingsView c = anchor.copy();
-      c.riskPreset = "Custom";
-      c.atrRiskLen = (int)profile[0];
-      c.slMultEff = profile[1];
-      c.tpEff = profile[2];
-      c.tp1Eff = profile[3];
-      c.tp2Eff = profile[4];
-      c.tp3Eff = profile[5];
-      considerOptimizerCandidate(acc, ctx, s, c, signalIndex);
-    }
-  }
-
-  private void considerOptimizerCandidate(OptimizerAccumulator acc, DataContext ctx, DataSeries s, SettingsView candidate, int signalIndex) {
-    if (acc.candidates >= MAX_OPTIMIZER_CANDIDATES) return;
-    if (candidate.enableSma && candidate.smaFast >= candidate.smaSlow) return;
-    if (candidate.enableEma && candidate.emaFast >= candidate.emaSlow) return;
-    if (candidate.enableMacd && candidate.macdFast >= candidate.macdSlow) return;
-    acc.candidates++;
-    int signalStart = optimizerSignalStart(signalIndex, candidate);
-    SignalArrays signals = buildOptimizationSignals(ctx, s, candidate, signalIndex, signalStart);
-    double[] atrRisk = atr(s, candidate.atrRiskLen);
-    BacktestStats stats = runBacktest(s, candidate, signalIndex, signals.longs, signals.shorts, atrRisk, candidate.optimizerLookback);
-    double fallbackScore = scoreBacktest(stats, candidate, false);
-    if (fallbackScore > Double.NEGATIVE_INFINITY && (acc.fallback == null || fallbackScore > acc.fallback.score)) {
-      boolean lowTrades = stats.trades < candidate.optimizerMinTrades;
-      acc.fallback = makeOptimizerResult(candidate, stats, fallbackScore, !lowTrades, lowTrades ? "below min trades" : null);
-    }
-    double score = scoreBacktest(stats, candidate, true);
-    if (score > Double.NEGATIVE_INFINITY && (acc.best == null || score > acc.best.score)) {
-      acc.best = makeOptimizerResult(candidate, stats, score, true, null);
-    }
-  }
-
-  private SignalArrays buildOptimizationSignals(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex, int startIndex) {
-    int n = s.size();
-    int evalStart = Math.max(0, startIndex);
-    int scanStart = Math.max(0, evalStart - optimizerWarmupBars(cfg));
-    double[] closes = closeArray(s);
-    boolean needsForge = !"Structure only".equals(cfg.signalSource);
-    double[] smaFast = needsForge && cfg.enableSma ? sma(closes, cfg.smaFast) : null;
-    double[] smaSlow = needsForge && cfg.enableSma ? sma(closes, cfg.smaSlow) : null;
-    double[] emaFast = needsForge && cfg.enableEma ? ema(closes, cfg.emaFast) : null;
-    double[] emaSlow = needsForge && cfg.enableEma ? ema(closes, cfg.emaSlow) : null;
-    double[] rsi = needsForge && cfg.enableRsi ? rsi(s, cfg.rsiLen) : null;
-    Macd macd = needsForge && cfg.enableMacd ? macd(s, cfg.macdFast, cfg.macdSlow, cfg.macdSignal) : null;
-    Stoch stoch = needsForge && cfg.enableStoch ? stoch(s, cfg.stochK, cfg.stochD, cfg.stochSmooth) : null;
-    Bands bb = needsForge && cfg.enableBb ? bollinger(closes, cfg.bbLen, cfg.bbMult) : null;
-    double[] ao = needsForge && cfg.enableAo ? ao(s) : null;
-    Sar sar = needsForge && cfg.enableSar ? sar(s, cfg.sarStart, cfg.sarInc, cfg.sarMax) : null;
-    double[] cci = needsForge && cfg.enableCci ? cci(s, cfg.cciLen) : null;
-    Adx adx = needsForge && cfg.enableAdx ? adx(s, cfg.diLen, cfg.adxLen) : null;
-    Super superTrend = needsForge && cfg.enableSt ? superTrend(s, cfg.stLen, cfg.stFactor) : null;
-    Tilson tilson = needsForge && cfg.enableTilson ? tilson(s, cfg.tilsonInput, cfg.tilsonMethod, cfg.tilsonPeriod) : null;
-    Smi smi = needsForge && cfg.enableSmi ? smi(s, cfg.smiInput, cfg.smiMethod, cfg.smiLongPeriod, cfg.smiShortPeriod, cfg.smiSignalPeriod) : null;
-    HtfBias htfBias = buildHtfBias(cfg, ctx, s, n);
-    boolean[] longs = new boolean[n];
-    boolean[] shorts = new boolean[n];
-
-    int warmup = Math.max(cfg.swingLen * 2, 50);
-    double lastSwingHigh = Double.NaN;
-    int lastSwingHighBar = -1;
-    double lastSwingLow = Double.NaN;
-    int lastSwingLowBar = -1;
-    boolean swingHighBroken = true;
-    boolean swingLowBroken = true;
-    int structTrend = 0;
-    boolean prevForgeLong = false;
-    boolean prevForgeShort = false;
-
-    for (int i = scanStart; i <= signalIndex && i < n; i++) {
-      boolean confirmed = s.isBarComplete(i);
-      int pivotBar = i - cfg.swingLen;
-      if (pivotBar >= cfg.swingLen && pivotBar + cfg.swingLen <= signalIndex) {
-        if (isPivotHigh(s, pivotBar, cfg.swingLen)) {
-          lastSwingHigh = s.getHigh(pivotBar);
-          lastSwingHighBar = pivotBar;
-          swingHighBroken = false;
-        }
-        if (isPivotLow(s, pivotBar, cfg.swingLen)) {
-          lastSwingLow = s.getLow(pivotBar);
-          lastSwingLowBar = pivotBar;
-          swingLowBroken = false;
-        }
-      }
-
-      double breakHighSrc = cfg.breakOnWick ? s.getHigh(i) : s.getClose(i);
-      double breakLowSrc = cfg.breakOnWick ? s.getLow(i) : s.getClose(i);
-      boolean rawBullBreak = !Double.isNaN(lastSwingHigh) && lastSwingHighBar >= 0 && !swingHighBroken && breakHighSrc > lastSwingHigh;
-      boolean rawBearBreak = !Double.isNaN(lastSwingLow) && lastSwingLowBar >= 0 && !swingLowBroken && breakLowSrc < lastSwingLow;
-      boolean conflict = rawBullBreak && rawBearBreak;
-      boolean bullBreak = rawBullBreak && !conflict && confirmed && i >= warmup;
-      boolean bearBreak = rawBearBreak && !conflict && confirmed && i >= warmup;
-      boolean isBullBos = false, isBullChoch = false, isBearBos = false, isBearChoch = false;
-      if (bullBreak) {
-        isBullBos = structTrend >= 0;
-        isBullChoch = structTrend < 0;
-        structTrend = 1;
-        swingHighBroken = true;
-      }
-      if (bearBreak) {
-        isBearBos = structTrend <= 0;
-        isBearChoch = structTrend > 0;
-        structTrend = -1;
-        swingLowBroken = true;
-      }
-
-      boolean bullEvent = eventAllowed(cfg.signalMode, isBullBos, isBullChoch);
-      boolean bearEvent = eventAllowed(cfg.signalMode, isBearBos, isBearChoch);
-      boolean htfBullOk = !cfg.useHtf || htfBias.bull[i];
-      boolean htfBearOk = !cfg.useHtf || htfBias.bear[i];
-      boolean forgeLong = false;
-      boolean forgeShort = false;
-      if (needsForge) {
-        ForgeState state = forgeState(cfg, i, smaFast, smaSlow, emaFast, emaSlow, rsi, macd, stoch, bb,
-          closes, ao, sar, cci, adx, superTrend, tilson, smi);
-        forgeLong = state.longOk;
-        forgeShort = state.shortOk;
-      }
-      boolean forgeLongRising = forgeLong && !prevForgeLong;
-      boolean forgeShortRising = forgeShort && !prevForgeShort;
-      longs[i] = switch (cfg.signalSource) {
-        case "Structure only" -> bullEvent && htfBullOk;
-        case "Forge only" -> forgeLongRising && htfBullOk;
-        default -> bullEvent && htfBullOk && forgeLong;
-      };
-      shorts[i] = switch (cfg.signalSource) {
-        case "Structure only" -> bearEvent && htfBearOk;
-        case "Forge only" -> forgeShortRising && htfBearOk;
-        default -> bearEvent && htfBearOk && forgeShort;
-      };
-
-      // Suppress conflicting long/short signals: store neither on a tie.
-      if (longs[i] && shorts[i]) {
-        longs[i] = false;
-        shorts[i] = false;
-      }
-      prevForgeLong = forgeLong;
-      prevForgeShort = forgeShort;
-    }
-    return new SignalArrays(longs, shorts);
-  }
-
-  private static OptimizerResult makeOptimizerResult(SettingsView cfg, BacktestStats stats, double score, boolean valid, String note) {
-    OptimizerResult out = new OptimizerResult();
-    out.valid = valid;
-    out.score = score;
-    out.stats = stats;
-    out.cfg = cfg.copy();
-    out.params = parameterSummary(cfg);
-    out.note = note;
-    return out;
-  }
-
-  private static double scoreBacktest(BacktestStats stats, SettingsView cfg, boolean enforceMinTrades) {
-    if (stats.trades == 0 || stats.netPoints <= 0.0) return Double.NEGATIVE_INFINITY;
-    if (enforceMinTrades && stats.trades < cfg.optimizerMinTrades) return Double.NEGATIVE_INFINITY;
-    double pf = boundedRatio(profitFactor(stats), 10.0);
-    double rf = boundedRatio(recoveryFactor(stats), 10.0);
-    return switch (cfg.optimizerObjective) {
-      case "Net Points" -> stats.netPoints + pf;
-      case "Profit Factor" -> pf * 1000.0 + stats.netPoints;
-      case "PF vs Max DD" -> pf * 900.0 + rf * 350.0 + stats.netPoints * 0.15 - stats.maxDrawdownPoints * 8.0;
-      case "Recovery Factor" -> rf * 1000.0 + stats.netPoints;
-      default -> stats.netPoints - stats.maxDrawdownPoints * 0.75 + Math.min(pf, 5.0) * 20.0 + Math.min(rf, 10.0) * 15.0;
-    };
-  }
-
-  private static double profitFactor(BacktestStats stats) {
-    double grossLossAbs = Math.abs(stats.grossLossPoints);
-    return grossLossAbs == 0.0 ? (stats.grossWinPoints > 0.0 ? Double.POSITIVE_INFINITY : 0.0) : stats.grossWinPoints / grossLossAbs;
-  }
-
-  private static double netProfitFactor(BacktestStats stats) {
-    double grossLossAbs = Math.abs(stats.grossLossPoints);
-    return grossLossAbs == 0.0 ? (stats.netPoints > 0.0 ? Double.POSITIVE_INFINITY : 0.0) : stats.netPoints / grossLossAbs;
-  }
-
-  private static double recoveryFactor(BacktestStats stats) {
-    return stats.maxDrawdownPoints == 0.0 ? (stats.netPoints > 0.0 ? Double.POSITIVE_INFINITY : 0.0) : stats.netPoints / stats.maxDrawdownPoints;
-  }
-
-  private static double boundedRatio(double value, double cap) {
-    if (Double.isInfinite(value)) return cap;
-    if (Double.isNaN(value)) return 0.0;
-    return Math.clamp(value, -cap, cap);
-  }
-
-  private static int[] uniqueInts(int[] values, int min, int max) {
-    int[] tmp = new int[values.length];
-    int count = 0;
-    for (int value : values) {
-      int v = Math.max(min, Math.min(max, value));
-      boolean seen = false;
-      for (int i = 0; i < count; i++) {
-        if (tmp[i] == v) { seen = true; break; }
-      }
-      if (!seen) tmp[count++] = v;
-    }
-    int[] out = Arrays.copyOf(tmp, count);
-    Arrays.sort(out);
-    return out;
-  }
-
-  private static double[] uniqueDoubles(double[] values, double min, double max) {
-    double[] tmp = new double[values.length];
-    int count = 0;
-    for (double value : values) {
-      double v = Math.max(min, Math.min(max, Math.round(value * 1000.0) / 1000.0));
-      boolean seen = false;
-      for (int i = 0; i < count; i++) {
-        if (Math.abs(tmp[i] - v) < 0.0000001) { seen = true; break; }
-      }
-      if (!seen) tmp[count++] = v;
-    }
-    double[] out = Arrays.copyOf(tmp, count);
-    Arrays.sort(out);
-    return out;
-  }
-  private static String[] uniqueStrings(String... values) {
-    String[] tmp = new String[values.length];
-    int count = 0;
-    for (String value : values) {
-      if (value == null || value.isEmpty()) continue;
-      boolean seen = false;
-      for (int i = 0; i < count; i++) {
-        if (tmp[i].equals(value)) { seen = true; break; }
-      }
-      if (!seen) tmp[count++] = value;
-    }
-    return Arrays.copyOf(tmp, count);
-  }
-
-  private static int optimizerSignalStart(int signalIndex, SettingsView cfg) {
-    return Math.max(0, signalIndex - Math.max(1, cfg.optimizerLookback) + 1);
-  }
-
-  private static int optimizerWarmupBars(SettingsView cfg) {
-    int indicatorWarmup = Math.max(Math.max(cfg.smaSlow, cfg.emaSlow), Math.max(cfg.macdSlow + cfg.macdSignal, cfg.adxLen + cfg.diLen));
-    indicatorWarmup = Math.max(indicatorWarmup, Math.max(cfg.stochK + cfg.stochD + cfg.stochSmooth, cfg.smiLongPeriod + cfg.smiShortPeriod + cfg.smiSignalPeriod));
-    indicatorWarmup = Math.max(indicatorWarmup, Math.max(cfg.bbLen, cfg.cciLen));
-    indicatorWarmup = Math.max(indicatorWarmup, Math.max(cfg.atrRiskLen, cfg.tilsonPeriod));
-    return Math.max(200, Math.max(cfg.swingLen * 6, indicatorWarmup * 3));
-  }
-
-
-  private static String optimizerKey(DataSeries s, SettingsView cfg, int signalIndex) {
-    StringBuilder b = new StringBuilder(448);
-    long signalTime = signalIndex >= 0 && signalIndex < s.size() ? s.getStartTime(signalIndex) : 0L;
-    b.append(signalIndex).append('|').append(s.size()).append('|').append(signalTime).append('|').append(s.getBarSize());
-    if (signalIndex >= 0 && signalIndex < s.size()) {
-      b.append('|').append(s.getOpen(signalIndex)).append('|').append(s.getHigh(signalIndex))
-        .append('|').append(s.getLow(signalIndex)).append('|').append(s.getClose(signalIndex));
-    }
-    b.append('|').append(cfg.optimizerLookback).append('|').append(cfg.optimizerMinTrades).append('|').append(cfg.optimizerObjective).append('|').append(cfg.optimizerSearch);
-    b.append('|').append(cfg.swingLen).append('|').append(cfg.breakOnWick).append('|').append(cfg.signalMode).append('|').append(cfg.signalSource);
-    b.append('|').append(cfg.useHtf).append('|').append(cfg.htfBarSize).append('|').append(cfg.htfEmaLen).append('|').append(cfg.requireAll);
-    b.append('|').append(cfg.enableSma).append('|').append(cfg.smaFast).append('|').append(cfg.smaSlow);
-    b.append('|').append(cfg.enableRsi).append('|').append(cfg.rsiLen).append('|').append(cfg.rsiLong).append('|').append(cfg.rsiShort);
-    b.append('|').append(cfg.enableMacd).append('|').append(cfg.macdFast).append('|').append(cfg.macdSlow).append('|').append(cfg.macdSignal);
-    b.append('|').append(cfg.enableSt).append('|').append(cfg.stLen).append('|').append(cfg.stFactor);
-    b.append('|').append(cfg.enableStoch).append('|').append(cfg.stochK).append('|').append(cfg.stochD).append('|').append(cfg.stochSmooth);
-    b.append('|').append(cfg.enableBb).append('|').append(cfg.bbLen).append('|').append(cfg.bbMult);
-    b.append('|').append(cfg.enableEma).append('|').append(cfg.emaFast).append('|').append(cfg.emaSlow);
-    b.append('|').append(cfg.enableAo).append('|').append(cfg.enableSar).append('|').append(cfg.sarStart).append('|').append(cfg.sarInc).append('|').append(cfg.sarMax);
-    b.append('|').append(cfg.enableCci).append('|').append(cfg.cciLen).append('|').append(cfg.cciLong).append('|').append(cfg.cciShort);
-    b.append('|').append(cfg.enableAdx).append('|').append(cfg.diLen).append('|').append(cfg.adxLen).append('|').append(cfg.adxThreshold);
-    b.append('|').append(cfg.enableTilson).append('|').append(cfg.tilsonInput).append('|').append(cfg.tilsonMethod).append('|').append(cfg.tilsonPeriod);
-    b.append('|').append(cfg.enableSmi).append('|').append(cfg.smiInput).append('|').append(cfg.smiMethod).append('|').append(cfg.smiLongPeriod).append('|').append(cfg.smiShortPeriod).append('|').append(cfg.smiSignalPeriod)
-      .append('|').append(cfg.smiTopGuide).append('|').append(cfg.smiBottomGuide).append('|').append(cfg.smiMode);
-    b.append('|').append(cfg.atrRiskLen).append('|').append(cfg.slMultEff).append('|').append(cfg.tpEff).append('|').append(cfg.tp1Eff).append('|').append(cfg.tp2Eff).append('|').append(cfg.tp3Eff).append('|').append(cfg.riskPreset).append('|').append(cfg.tpMode).append('|').append(cfg.singleTarget).append('|').append(cfg.useBreakEven);
-    return b.toString();
-  }
-
   private String calculationKey(DataSeries s, SettingsView cfg, int signalIndex) {
     StringBuilder b = new StringBuilder(768);
-    b.append(optimizerKey(s, cfg, signalIndex));
+    b.append(MeridianOptimizer.optimizerKey(s, cfg, signalIndex));
     b.append('|').append(s.size() == 0 ? 0L : s.getStartTime(0));
     b.append('|').append(cfg.showStruct).append('|').append(cfg.showBos).append('|').append(cfg.showOB)
       .append('|').append(cfg.obFrom).append('|').append(cfg.obMitWick).append('|').append(cfg.removeMitigated)
@@ -1764,31 +1019,6 @@ public class MeridianFlowForge extends Study
 
   private static int rgb(Color c) {
     return c == null ? 0 : c.getRGB();
-  }
-
-
-  private static void updateDrawdown(BacktestStats stats, double equity) {
-    if (equity > stats.peakPoints) stats.peakPoints = equity;
-    double drawdown = stats.peakPoints - equity;
-    if (drawdown > stats.maxDrawdownPoints) stats.maxDrawdownPoints = drawdown;
-  }
-
-  private static void closeBacktestTrade(BacktestStats stats, int dir, double entry, double exit) {
-    double pnl = dir * (exit - entry);
-    stats.trades++;
-    stats.netPoints += pnl;
-    updateDrawdown(stats, stats.netPoints);
-    if (pnl > 0) {
-      stats.wins++;
-      stats.grossWinPoints += pnl;
-    }
-    else if (pnl < 0) {
-      stats.losses++;
-      stats.grossLossPoints += pnl;
-    }
-    else {
-      stats.breakEvens++;
-    }
   }
 
   private static int enabledCount(SettingsView cfg) {

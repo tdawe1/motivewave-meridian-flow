@@ -2,4 +2,5 @@ build/
 *.class
 *.jar
 *.log
+.idea/
 .DS_Store
