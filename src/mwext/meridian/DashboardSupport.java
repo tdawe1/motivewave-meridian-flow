@@ -36,6 +36,14 @@ final class DashboardSupport {
     };
   }
 
+  static String depthLabel(String depth) {
+    return switch (depth) {
+      case "Deep" -> "Deep";
+      case "Medium" -> "Med";
+      default -> "Fast";
+    };
+  }
+
   static String parameterSummaryRisk(SettingsView cfg) {
     if (cfg.singleTarget) {
       return "ATR " + cfg.atrRiskLen + " SLx" + formatOne(cfg.slMultEff) + " TPx" + formatOne(cfg.tpEff);

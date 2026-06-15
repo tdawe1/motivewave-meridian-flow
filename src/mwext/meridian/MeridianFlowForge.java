@@ -65,7 +65,7 @@ import java.util.List;
 )
 public class MeridianFlowForge extends Study
 {
-  static final String VERSION = "v12-extract-backtest-optimizer";
+  static final String VERSION = "v13-deep-optimizer-dashboard-fix";
   private static volatile boolean loggedCalculate;
 
   private final MeridianOptimizer optimizer = new MeridianOptimizer();
@@ -156,6 +156,7 @@ public class MeridianFlowForge extends Study
   static final String OPT_SEARCH = "optimizerSearch";
   static final String OPT_REFRESH_MODE = "optimizerRefreshMode";
   static final String OPT_REFRESH_INTERVAL = "optimizerRefreshInterval";
+  static final String OPT_DEPTH = "optimizerDepth";
   static final String APPLY_OPTIMIZER = "applyOptimizer";
   static final String DASHBOARD_MODE = "dashboardMode";
   static final String DASHBOARD_HIDE_UNUSED = "dashboardHideUnused";
@@ -335,6 +336,7 @@ public class MeridianFlowForge extends Study
     optg.addRow(new DiscreteDescriptor(OPT_REFRESH_MODE, "Refresh Mode", "Every Bar",
       opts("Every Bar", "Every N Bars", "On Demand")),
       new IntegerDescriptor(OPT_REFRESH_INTERVAL, "Refresh Every N Bars", 5, 1, 500, 1));
+    optg.addRow(new DiscreteDescriptor(OPT_DEPTH, "Optimizer Depth", "Fast", opts("Fast", "Medium", "Deep")));
 
     SettingTab visual = sd.addTab("Visual");
     SettingGroup vg = visual.addGroup("Display");
@@ -369,9 +371,8 @@ public class MeridianFlowForge extends Study
     SettingGroup ag = alerts.addGroup("Alerts");
     ag.addRow(new BooleanDescriptor(ALERT_SL, "Alert on SL Hit", true));
     ag.addRow(new BooleanDescriptor(ALERT_TP, "Alert on TP / Break-Even", false));
-    ag.addRow(new BooleanDescriptor(ALERT_OB, "Alert on OB Mitigation", false));
+    sd.addQuickSettings(SWING_LEN, BREAK_SRC, SIGNAL_SOURCE, SIGNAL_MODE, SIGNAL_GROUP, SHOW_OB, MAX_OB, ENABLE_SMA, ENABLE_ST, ENABLE_TILSON, ENABLE_SMI, USE_HTF, TP_MODE, SHOW_DASHBOARD, DASHBOARD_MODE, SHOW_OPTIMIZER, APPLY_OPTIMIZER, OPT_DEPTH, SHOW_PROJECTION);
 
-    sd.addQuickSettings(SWING_LEN, BREAK_SRC, SIGNAL_SOURCE, SIGNAL_MODE, SIGNAL_GROUP, SHOW_OB, MAX_OB, ENABLE_SMA, ENABLE_ST, ENABLE_TILSON, ENABLE_SMI, USE_HTF, TP_MODE, SHOW_DASHBOARD, DASHBOARD_MODE, SHOW_OPTIMIZER, APPLY_OPTIMIZER, SHOW_PROJECTION);
 
     RuntimeDescriptor rd = createRD();
     rd.setLabelSettings(SWING_LEN, SIGNAL_SOURCE, SIGNAL_MODE, SIGNAL_GROUP);
@@ -953,7 +954,7 @@ public class MeridianFlowForge extends Study
       rows[row++] = dashRow("Net", formatSigned(stats.netPoints), "DD " + formatPoints(stats.maxDrawdownPoints), signedColor(stats.netPoints));
       rows[row++] = dashRow("Tgt", targetStats(stats, cfg), "SL " + stats.stops, stats.stops <= stats.wins ? DashboardFigure.GOOD : DashboardFigure.WARN);
       if (opt != null && opt.stats != null) {
-        rows[row++] = headerRow("Opt", opt.objective, opt.valid ? opt.candidates + "x" : "low trades", opt.valid ? DashboardFigure.GOOD : DashboardFigure.WARN);
+        rows[row++] = headerRow("Opt", opt.objective + " " + depthLabel(cfg.optimizerDepth), opt.valid ? opt.candidates + "x" : "low trades", opt.valid ? DashboardFigure.GOOD : DashboardFigure.WARN);
         rows[row++] = dashRow("Rec", parameterSummaryRisk(opt.cfg), optStale ? "APPLY" : "OK", optStale ? DashboardFigure.WARN : DashboardFigure.GOOD);
         rows[row++] = dashRow("Perf", formatSigned(opt.stats.netPoints), "PF " + formatRatio(MeridianBacktest.profitFactor(opt.stats)) + " DD " + formatPoints(opt.stats.maxDrawdownPoints), signedColor(opt.stats.netPoints));
       }
@@ -972,7 +973,7 @@ public class MeridianFlowForge extends Study
       rows[row++] = dashRow("Gross W/L", formatSigned(stats.grossWinPoints), formatSigned(stats.grossLossPoints), signedColor(stats.grossWinPoints + stats.grossLossPoints));
       rows[row++] = dashRow("Stops / targets", stats.stops + " stops", targetStats(stats, cfg), stats.stops <= stats.wins ? DashboardFigure.GOOD : DashboardFigure.WARN);
       if (opt != null && opt.stats != null) {
-        rows[row++] = headerRow("Optimizer", opt.objective, opt.valid ? opt.candidates + " tries" : "below min trades", opt.valid ? DashboardFigure.GOOD : DashboardFigure.WARN);
+        rows[row++] = headerRow("Optimizer", opt.objective + " · " + depthLabel(cfg.optimizerDepth), opt.valid ? opt.candidates + " tries" : "below min trades", opt.valid ? DashboardFigure.GOOD : DashboardFigure.WARN);
         rows[row++] = dashRow("Apply status", optStale ? "REC OUT OF DATE" : "Current matches rec", optStale ? "tick Apply Optimizer" : "", optStale ? DashboardFigure.WARN : DashboardFigure.GOOD);
         rows[row++] = dashRow("Opt stats", formatSigned(opt.stats.netPoints), "PF " + formatRatio(MeridianBacktest.profitFactor(opt.stats)) + " • DD " + formatPoints(opt.stats.maxDrawdownPoints) + " • RF " + formatRatio(MeridianBacktest.recoveryFactor(opt.stats)), signedColor(opt.stats.netPoints));
         rows[row++] = dashRow("Opt core", parameterSummaryCore(opt.cfg), opt.note == null ? "" : opt.note, DashboardFigure.ACCENT);
@@ -1008,8 +1009,10 @@ public class MeridianFlowForge extends Study
     b.append('|').append(cfg.showRisk).append('|').append(cfg.showAtrTrend).append('|').append(cfg.atrTrendLen)
       .append('|').append(cfg.atrTrendMult).append('|').append(cfg.atrSmooth);
     b.append('|').append(cfg.showDashboard).append('|').append(cfg.dashboardLookback).append('|').append(cfg.dashboardMode).append('|').append(cfg.dashboardHideUnused)
+      .append('|').append(cfg.dashboardPosPreset).append('|').append(cfg.dashboardXOffset).append('|').append(cfg.dashboardYOffset).append('|').append(cfg.dashboardScale)
       .append('|').append(cfg.showProjection).append('|').append(cfg.projectionBars)
-      .append('|').append(cfg.showOptimizer).append('|').append(cfg.alertSl).append('|').append(cfg.alertTp).append('|').append(cfg.alertOb);
+      .append('|').append(cfg.showOptimizer).append('|').append(cfg.optRefreshMode).append('|').append(cfg.optRefreshInterval)
+      .append('|').append(cfg.alertSl).append('|').append(cfg.alertTp).append('|').append(cfg.alertOb);
     b.append('|').append(rgb(cfg.bullColor)).append('|').append(rgb(cfg.bearColor))
       .append('|').append(rgb(cfg.obBullColor)).append('|').append(rgb(cfg.obBearColor)).append('|').append(rgb(cfg.neutralColor));
     b.append('|').append(markerSig(UP_MARKER)).append('|').append(markerSig(DOWN_MARKER));

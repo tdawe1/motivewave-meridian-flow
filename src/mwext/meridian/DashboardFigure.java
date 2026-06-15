@@ -67,15 +67,22 @@ final class DashboardFigure extends Figure {
   @Override
   public void layout(DrawContext ctx) {
     Rectangle chart = ctx == null ? null : ctx.getBounds();
+    if (chart == null) {
+      setBounds(new Rectangle2D.Double(0, 0, COMPACT_MIN_W, PAD_Y * 2 + ROW_H));
+      return;
+    }
+    int chartW = chart.width;
+    int chartH = chart.height;
+
     int minW = (int)Math.round((compact ? COMPACT_MIN_W : FULL_MIN_W) * scale);
     int maxW = (int)Math.round((compact ? COMPACT_MAX_W : FULL_MAX_W) * scale);
-    int width = minW;
-    if (chart != null) width = Math.max(minW, Math.min(maxW, chart.width - 24));
+    int width = Math.max(minW, Math.min(maxW, chartW - 24));
+    width = Math.min(width, chartW);
+
     int height = PAD_Y * 2 + Math.max(1, count) * ROW_H;
     if (optStale) height += APPLY_BTN_H + 4;
+    height = Math.min(height, chartH);
 
-    int chartW = chart == null ? 800 : chart.width;
-    int chartH = chart == null ? 600 : chart.height;
     int ox = Math.max(0, Math.min(xOffset, chartW - width));
     int oy = Math.max(0, Math.min(yOffset, chartH - height));
 
@@ -84,9 +91,13 @@ final class DashboardFigure extends Figure {
       case "Top Right" -> { x = chartW - width - ox; y = oy; }
       case "Bottom Left" -> { x = ox; y = chartH - height - oy; }
       case "Bottom Right" -> { x = chartW - width - ox; y = chartH - height - oy; }
-      default -> { x = ox; y = oy; } // "Top Left" or "Custom"
+      default -> { x = ox; y = oy; }
     }
-    if (chart != null) { x += chart.x; y += chart.y; }
+
+    x = Math.max(0, Math.min(x, chartW - width));
+    y = Math.max(0, Math.min(y, chartH - height));
+    x += chart.x;
+    y += chart.y;
 
     setBounds(new Rectangle2D.Double(x, y, width, height));
   }
@@ -94,7 +105,7 @@ final class DashboardFigure extends Figure {
   @Override
   public void draw(Graphics2D gc, DrawContext ctx) {
     if (gc == null || count == 0) return;
-    if (getBounds() == null) layout(ctx);
+    layout(ctx);
     Rectangle2D b = getBounds();
     int x = (int)Math.round(b.getX());
     int y = (int)Math.round(b.getY());

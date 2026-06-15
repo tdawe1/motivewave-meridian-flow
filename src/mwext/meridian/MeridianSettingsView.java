@@ -24,6 +24,7 @@ final class SettingsView {
   String signalMode, obFrom, signalSource, riskPreset, optimizerObjective, optimizerSearch, optRefreshMode, dashboardMode, tpMode, signalGroup;
   String tilsonInput, tilsonMethod, smiInput, smiMethod, smiMode;
   BarSize htfBarSize;
+  String optimizerDepth;
   Color bullColor, bearColor, obBullColor, obBearColor, neutralColor;
 
   void read(com.motivewave.platform.sdk.common.Settings st, DataContext ctx) {
@@ -138,6 +139,7 @@ final class SettingsView {
     optimizerObjective = st.getString(MeridianFlowForge.OPT_OBJECTIVE, "Balanced");
     optimizerSearch = st.getString(MeridianFlowForge.OPT_SEARCH, "NQ 5/15m Fast");
     optRefreshMode = st.getString(MeridianFlowForge.OPT_REFRESH_MODE, "Every Bar");
+    optimizerDepth = st.getString(MeridianFlowForge.OPT_DEPTH, "Fast");
     optRefreshInterval = st.getInteger(MeridianFlowForge.OPT_REFRESH_INTERVAL, 5);
     dashboardLookback = st.getInteger(MeridianFlowForge.DASHBOARD_LOOKBACK, 5000);
     atrTrendLen = st.getInteger(MeridianFlowForge.ATR_TREND_LEN, 10);
@@ -174,7 +176,7 @@ final class SettingsView {
     c.useHtf = useHtf; c.requireAll = requireAll; c.enableSma = enableSma; c.enableRsi = enableRsi; c.enableMacd = enableMacd; c.enableSt = enableSt; c.enableStoch = enableStoch; c.enableBb = enableBb; c.enableEma = enableEma;
     c.enableAo = enableAo; c.enableSar = enableSar; c.enableCci = enableCci; c.enableAdx = enableAdx; c.enableTilson = enableTilson; c.enableSmi = enableSmi; c.showRisk = showRisk; c.useBreakEven = useBreakEven; c.showAtrTrend = showAtrTrend; c.showDashboard = showDashboard; c.showOptimizer = showOptimizer; c.showProjection = showProjection; c.dashboardCompact = dashboardCompact; c.dashboardHideUnused = dashboardHideUnused; c.singleTarget = singleTarget;
     c.alertSl = alertSl; c.alertTp = alertTp; c.alertOb = alertOb;
-    c.signalMode = signalMode; c.obFrom = obFrom; c.signalSource = signalSource; c.riskPreset = riskPreset; c.optimizerObjective = optimizerObjective; c.optimizerSearch = optimizerSearch; c.optRefreshMode = optRefreshMode; c.dashboardMode = dashboardMode; c.tpMode = tpMode; c.signalGroup = signalGroup;
+    c.signalMode = signalMode; c.obFrom = obFrom; c.signalSource = signalSource; c.riskPreset = riskPreset; c.optimizerObjective = optimizerObjective; c.optimizerSearch = optimizerSearch; c.optRefreshMode = optRefreshMode; c.optimizerDepth = optimizerDepth; c.dashboardMode = dashboardMode; c.tpMode = tpMode; c.signalGroup = signalGroup;
     c.dashboardPosPreset = dashboardPosPreset;
     c.tilsonInput = tilsonInput; c.tilsonMethod = tilsonMethod; c.smiInput = smiInput; c.smiMethod = smiMethod; c.smiMode = smiMode;
     c.htfBarSize = htfBarSize;
