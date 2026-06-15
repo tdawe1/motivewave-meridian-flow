@@ -21,7 +21,7 @@ final class SettingsView {
   boolean useHtf, requireAll, enableSma, enableRsi, enableMacd, enableSt, enableStoch, enableBb, enableEma;
   boolean enableAo, enableSar, enableCci, enableAdx, enableTilson, enableSmi, showRisk, useBreakEven, showAtrTrend, showDashboard, showOptimizer, autoApplyOptimizer, showProjection, dashboardCompact, dashboardHideUnused, singleTarget, alertSl, alertTp, alertOb;
   String dashboardPosPreset;
-  String signalMode, obFrom, signalSource, riskPreset, optimizerObjective, optimizerSearch, optRefreshMode, dashboardMode, tpMode, signalGroup;
+  String signalMode, obFrom, signalSource, riskPreset, optimizerObjective, optimizerSearch, optRefreshMode, dashboardMode, tpMode;
   String tilsonInput, tilsonMethod, smiInput, smiMethod, smiMode;
   BarSize htfBarSize;
   String optimizerDepth;
@@ -32,7 +32,6 @@ final class SettingsView {
     breakOnWick = "Wick".equals(st.getString(MeridianFlowForge.BREAK_SRC, "Close"));
     signalMode = st.getString(MeridianFlowForge.SIGNAL_MODE, "BOS + CHoCH");
     signalSource = st.getString(MeridianFlowForge.SIGNAL_SOURCE, "Structure + Forge");
-    signalGroup = st.getString(MeridianFlowForge.SIGNAL_GROUP, "Manual");
     showStruct = st.getBoolean(MeridianFlowForge.SHOW_STRUCT, true);
     showBos = st.getBoolean(MeridianFlowForge.SHOW_BOS, true);
     showOB = st.getBoolean(MeridianFlowForge.SHOW_OB, true);
@@ -156,7 +155,6 @@ final class SettingsView {
     alertTp = st.getBoolean(MeridianFlowForge.ALERT_TP, false);
     alertOb = st.getBoolean(MeridianFlowForge.ALERT_OB, false);
 
-    applySignalGroup(this, signalGroup);
   }
 
 
@@ -177,7 +175,7 @@ final class SettingsView {
     c.useHtf = useHtf; c.requireAll = requireAll; c.enableSma = enableSma; c.enableRsi = enableRsi; c.enableMacd = enableMacd; c.enableSt = enableSt; c.enableStoch = enableStoch; c.enableBb = enableBb; c.enableEma = enableEma;
     c.enableAo = enableAo; c.enableSar = enableSar; c.enableCci = enableCci; c.enableAdx = enableAdx; c.enableTilson = enableTilson; c.enableSmi = enableSmi; c.showRisk = showRisk; c.useBreakEven = useBreakEven; c.showAtrTrend = showAtrTrend; c.showDashboard = showDashboard; c.showOptimizer = showOptimizer; c.autoApplyOptimizer = autoApplyOptimizer; c.showProjection = showProjection; c.dashboardCompact = dashboardCompact; c.dashboardHideUnused = dashboardHideUnused; c.singleTarget = singleTarget;
     c.alertSl = alertSl; c.alertTp = alertTp; c.alertOb = alertOb;
-    c.signalMode = signalMode; c.obFrom = obFrom; c.signalSource = signalSource; c.riskPreset = riskPreset; c.optimizerObjective = optimizerObjective; c.optimizerSearch = optimizerSearch; c.optRefreshMode = optRefreshMode; c.optimizerDepth = optimizerDepth; c.dashboardMode = dashboardMode; c.tpMode = tpMode; c.signalGroup = signalGroup;
+    c.signalMode = signalMode; c.obFrom = obFrom; c.signalSource = signalSource; c.riskPreset = riskPreset; c.optimizerObjective = optimizerObjective; c.optimizerSearch = optimizerSearch; c.optRefreshMode = optRefreshMode; c.optimizerDepth = optimizerDepth; c.dashboardMode = dashboardMode; c.tpMode = tpMode;
     c.dashboardPosPreset = dashboardPosPreset;
     c.tilsonInput = tilsonInput; c.tilsonMethod = tilsonMethod; c.smiInput = smiInput; c.smiMethod = smiMethod; c.smiMode = smiMode;
     c.htfBarSize = htfBarSize;
@@ -185,44 +183,4 @@ final class SettingsView {
     return c;
   }
 
-  static void applySignalGroup(SettingsView c, String group) {
-    switch (group) {
-      case "Trend Confirmation" -> {
-        c.requireAll = false;
-        c.enableSma = true; c.enableEma = false; c.enableMacd = false; c.enableSt = true;
-        c.enableRsi = false; c.enableStoch = false; c.enableBb = false; c.enableAo = false;
-        c.enableSar = false; c.enableCci = false; c.enableAdx = true;
-        c.enableTilson = false; c.enableSmi = false;
-      }
-      case "Momentum Pullback" -> {
-        c.requireAll = false;
-        c.enableSma = false; c.enableEma = false; c.enableMacd = false; c.enableSt = false;
-        c.enableRsi = true; c.enableStoch = true; c.enableBb = false; c.enableAo = false;
-        c.enableSar = true; c.enableCci = false; c.enableAdx = false;
-        c.enableTilson = false; c.enableSmi = false;
-      }
-      case "Mean Reversion" -> {
-        c.requireAll = true;
-        c.enableSma = false; c.enableEma = false; c.enableMacd = false; c.enableSt = false;
-        c.enableRsi = true; c.enableStoch = true; c.enableBb = true; c.enableAo = false;
-        c.enableSar = false; c.enableCci = true; c.enableAdx = false;
-        c.enableTilson = false; c.enableSmi = false;
-      }
-      case "Structure Only" -> {
-        c.signalSource = "Structure only";
-        c.requireAll = true;
-        c.enableSma = false; c.enableEma = false; c.enableMacd = false; c.enableSt = false;
-        c.enableRsi = false; c.enableStoch = false; c.enableBb = false; c.enableAo = false;
-        c.enableSar = false; c.enableCci = false; c.enableAdx = false;
-        c.enableTilson = false; c.enableSmi = false;
-      }
-      case "Balanced" -> {
-        c.requireAll = true;
-        c.enableSma = true; c.enableEma = false; c.enableMacd = false; c.enableSt = true;
-        c.enableRsi = true; c.enableStoch = false; c.enableBb = false; c.enableAo = false;
-        c.enableSar = false; c.enableCci = false; c.enableAdx = false;
-        c.enableTilson = false; c.enableSmi = false;
-      }
-    }
-  }
 }

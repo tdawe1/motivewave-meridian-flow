@@ -65,7 +65,7 @@ import java.util.List;
 )
 public class MeridianFlowForge extends Study
 {
-  static final String VERSION = "v18-stable-optimizer-status";
+  static final String VERSION = "v19-balanced-no-modes";
   private static volatile boolean loggedCalculate;
 
   private final MeridianOptimizer optimizer = new MeridianOptimizer();
@@ -96,7 +96,6 @@ public class MeridianFlowForge extends Study
   static final String HTF_EMA_LEN = "htfEmaLen";
 
   static final String REQUIRE_ALL = "requireAll";
-  static final String SIGNAL_GROUP = "signalGroup";
   static final String ENABLE_SMA = "enableSma";
   static final String SMA_FAST = "smaFast";
   static final String SMA_SLOW = "smaSlow";
@@ -234,7 +233,6 @@ public class MeridianFlowForge extends Study
     sg.addRow(new DiscreteDescriptor(BREAK_SRC, "Break Confirmation", "Close", opts("Close", "Wick")));
     sg.addRow(new DiscreteDescriptor(SIGNAL_MODE, "Signal Mode", "BOS + CHoCH", opts("BOS + CHoCH", "CHoCH only", "BOS only")));
     sg.addRow(new DiscreteDescriptor(SIGNAL_SOURCE, "Confirmed Signal Source", "Structure + Forge", opts("Structure + Forge", "Structure only", "Forge only")));
-    sg.addRow(new DiscreteDescriptor(SIGNAL_GROUP, "Signal Group", "Manual", opts("Manual", "Trend Confirmation", "Momentum Pullback", "Mean Reversion", "Structure Only", "Balanced")));
     sg.addRow(new BooleanDescriptor(SHOW_STRUCT, "Show HH/HL/LH/LL", true));
     sg.addRow(new BooleanDescriptor(SHOW_BOS, "Show BOS/CHoCH", true));
 
@@ -373,11 +371,11 @@ public class MeridianFlowForge extends Study
     SettingGroup ag = alerts.addGroup("Alerts");
     ag.addRow(new BooleanDescriptor(ALERT_SL, "Alert on SL Hit", true));
     ag.addRow(new BooleanDescriptor(ALERT_TP, "Alert on TP / Break-Even", false));
-    sd.addQuickSettings(SWING_LEN, BREAK_SRC, SIGNAL_SOURCE, SIGNAL_MODE, SIGNAL_GROUP, SHOW_OB, MAX_OB, ENABLE_SMA, ENABLE_ST, ENABLE_TILSON, ENABLE_SMI, USE_HTF, TP_MODE, SHOW_DASHBOARD, DASHBOARD_MODE, SHOW_OPTIMIZER, APPLY_OPTIMIZER, OPT_DEPTH, SHOW_PROJECTION);
+    sd.addQuickSettings(SWING_LEN, BREAK_SRC, SIGNAL_SOURCE, SIGNAL_MODE, SHOW_OB, MAX_OB, ENABLE_SMA, ENABLE_ST, ENABLE_TILSON, ENABLE_SMI, USE_HTF, TP_MODE, SHOW_DASHBOARD, DASHBOARD_MODE, SHOW_OPTIMIZER, APPLY_OPTIMIZER, OPT_DEPTH, SHOW_PROJECTION);
 
 
     RuntimeDescriptor rd = createRD();
-    rd.setLabelSettings(SWING_LEN, SIGNAL_SOURCE, SIGNAL_MODE, SIGNAL_GROUP);
+    rd.setLabelSettings(SWING_LEN, SIGNAL_SOURCE, SIGNAL_MODE);
     rd.exportValue(new ValueDescriptor(Values.ATR_TREND, "ATR Trend", ATR_TREND_LEN, ATR_TREND_MULT));
     rd.declarePath(Values.ATR_TREND, ATR_TREND_PATH);
     rd.declareIndicator(Values.ATR_TREND, Inputs.IND);
@@ -960,7 +958,6 @@ public class MeridianFlowForge extends Study
     if (cfg.dashboardCompact) {
       rows[row++] = headerRow("MF", VERSION, signal, signalColor);
       rows[row++] = dashRow("Sig", signal, enabledCount(cfg) + "F " + (cfg.requireAll ? "ALL" : "ANY"), signalColor);
-      rows[row++] = dashRow("Grp", cfg.signalGroup, "Manual".equals(cfg.signalGroup) ? cfg.signalSource : signalGroupRegime(cfg), DashboardFigure.ACCENT);
       rows[row++] = dashRow("Run", optimizer.statusValue(), optimizer.statusExtra(), optimizerStatusColor(optimizer.statusKind()));
       rows[row++] = dashRow("BT", bars + "b/" + stats.trades + "t", formatPct(winRate) + " WR", DashboardFigure.TEXT);
       rows[row++] = dashRow("PF", formatRatio(profitFactor), "NPF " + formatRatio(netProfitFactor), ratioColor(profitFactor, 1.0));
@@ -975,7 +972,6 @@ public class MeridianFlowForge extends Study
     else {
       rows[row++] = headerRow("Meridian Forge", VERSION, signal, signalColor);
       rows[row++] = dashRow("Signal", signal, enabledCount(cfg) + " filters • " + (cfg.requireAll ? "ALL" : "ANY"), signalColor);
-      rows[row++] = dashRow("Signal Group", cfg.signalGroup, "Manual".equals(cfg.signalGroup) ? cfg.signalSource : signalGroupRegime(cfg), DashboardFigure.ACCENT);
       rows[row++] = dashRow("Core filters", coreFilterSnapshot(cfg, signalIndex, s.getClose(signalIndex), rsi, stoch, sar), "", DashboardFigure.TEXT);
       rows[row++] = dashRow("Strategy filters", strategyFilterSnapshot(cfg, signalIndex, tilson, smi), "", DashboardFigure.TEXT);
       rows[row++] = dashRow("Target mode", cfg.singleTarget ? "Single target" : "Three targets", parameterSummaryRisk(cfg), DashboardFigure.TEXT);

@@ -21,20 +21,9 @@ final class DashboardSupport {
   }
 
   static String parameterSummaryCore(SettingsView cfg) {
-    String group = "Manual".equals(cfg.signalGroup) ? cfg.signalSource : cfg.signalGroup;
-    return "Sw " + cfg.swingLen + " • " + group + " • " + cfg.signalMode;
+    return "Sw " + cfg.swingLen + " • " + cfg.signalSource + " • " + cfg.signalMode;
   }
 
-  static String signalGroupRegime(SettingsView cfg) {
-    return switch (cfg.signalGroup) {
-      case "Trend Confirmation" -> "Trending";
-      case "Momentum Pullback" -> "Trend w/ Pullback";
-      case "Mean Reversion" -> "Ranging / Mean-Reverting";
-      case "Structure Only" -> "Structure / No Filter";
-      case "Balanced" -> "Balanced Multi-Filter";
-      default -> cfg.signalSource;
-    };
-  }
 
   static String depthLabel(String depth) {
     return switch (depth) {

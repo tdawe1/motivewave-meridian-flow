@@ -179,8 +179,7 @@ final class MeridianOptimizer {
 
       SettingsView anchor = seed.copy();
       for (int pass = 0; pass < passes && acc.candidates < maxCand; pass++) {
-        boolean multiFamily = iterative && pass >= 1;
-        scanAll(acc, ctx, s, anchor, signalIndex, maxCand, multiFamily);
+        scanAll(acc, ctx, s, anchor, signalIndex, maxCand);
         if (iterative && acc.best != null) {
           anchor = acc.best.cfg.copy();
         }
@@ -189,9 +188,6 @@ final class MeridianOptimizer {
         }
       }
 
-      if ("Manual".equals(seed.signalGroup)) {
-        scanBundles(acc, ctx, s, seed, signalIndex, maxCand, depth);
-      }
 
       OptimizerResult out = acc.best == null ? acc.fallback : acc.best;
       if (out == null) {
@@ -216,7 +212,7 @@ final class MeridianOptimizer {
   }
 
   private void scanAll(OptimizerAccumulator acc, DataContext ctx, DataSeries s, SettingsView anchor,
-                       int signalIndex, int maxCand, boolean multiFamily) {
+                       int signalIndex, int maxCand) {
     scanSwing(acc, ctx, s, anchor, signalIndex, maxCand);
     scanSma(acc, ctx, s, anchor, signalIndex, maxCand);
     scanRsi(acc, ctx, s, anchor, signalIndex, maxCand);
@@ -225,9 +221,6 @@ final class MeridianOptimizer {
     scanTilson(acc, ctx, s, anchor, signalIndex, maxCand);
     scanSmi(acc, ctx, s, anchor, signalIndex, maxCand);
     scanRisk(acc, ctx, s, anchor, signalIndex, maxCand);
-    if (multiFamily) {
-      scanMultiFamilyCross(acc, ctx, s, anchor, signalIndex, maxCand);
-    }
   }
 
   private void scanSwing(OptimizerAccumulator acc, DataContext ctx, DataSeries s, SettingsView anchor, int signalIndex, int maxCand) {
@@ -395,101 +388,6 @@ final class MeridianOptimizer {
     }
   }
 
-  // --- Coherent bundle support ---
-
-  /** Apply a named signal group bundle to a candidate, then evaluate it. */
-  private void applyCandidateBundle(OptimizerAccumulator acc, DataContext ctx, DataSeries s,
-                                    SettingsView seed, String bundleName, int signalIndex, int maxCand) {
-    SettingsView c = seed.copy();
-    SettingsView.applySignalGroup(c, bundleName);
-    c.signalGroup = bundleName;
-    // Ensure signal source is appropriate for the bundle
-    if ("Structure Only".equals(bundleName)) {
-      c.signalSource = "Structure only";
-    }
-    considerOptimizerCandidate(acc, ctx, s, c, signalIndex, maxCand);
-  }
-
-  /** Scan all coherent bundles in Manual mode, with depth-appropriate granularity. */
-  private void scanBundles(OptimizerAccumulator acc, DataContext ctx, DataSeries s,
-                           SettingsView seed, int signalIndex, int maxCand, String depth) {
-    String[] groups = {"Trend Confirmation", "Momentum Pullback", "Mean Reversion", "Structure Only", "Balanced"};
-    // Pass 1: evaluate each bundle as-is with user's default params
-    for (String group : groups) {
-      if (acc.candidates >= maxCand) return;
-      applyCandidateBundle(acc, ctx, s, seed, group, signalIndex, maxCand);
-    }
-    if (!"Fast".equals(depth)) {
-      for (String group : groups) {
-        if (acc.candidates >= maxCand) return;
-        SettingsView bundleCfg = seed.copy();
-        SettingsView.applySignalGroup(bundleCfg, group);
-        bundleCfg.signalGroup = group;
-        scanWithinBundle(acc, ctx, s, bundleCfg, signalIndex, maxCand);
-      }
-    }
-  }
-
-  /** Scan parameter variations within a single coherent bundle, respecting its indicator set. */
-  private void scanWithinBundle(OptimizerAccumulator acc, DataContext ctx, DataSeries s,
-                                SettingsView anchor, int signalIndex, int maxCand) {
-    scanSwing(acc, ctx, s, anchor, signalIndex, maxCand);
-    scanSma(acc, ctx, s, anchor, signalIndex, maxCand);
-    scanRsi(acc, ctx, s, anchor, signalIndex, maxCand);
-    scanStoch(acc, ctx, s, anchor, signalIndex, maxCand);
-    scanSar(acc, ctx, s, anchor, signalIndex, maxCand);
-    scanTilson(acc, ctx, s, anchor, signalIndex, maxCand);
-    scanSmi(acc, ctx, s, anchor, signalIndex, maxCand);
-    scanRisk(acc, ctx, s, anchor, signalIndex, maxCand);
-  }
-
-  /** Deep-mode cross-family scans where multiple parameter families change together. */
-  private void scanMultiFamilyCross(OptimizerAccumulator acc, DataContext ctx, DataSeries s,
-                                    SettingsView anchor, int signalIndex, int maxCand) {
-    // Cross-family bundle 1: RSI + Stochastic together (momentum cluster)
-    if (anchor.enableRsi && anchor.enableStoch && acc.candidates < maxCand) {
-      int[] rsiLens = uniqueInts(new int[] {anchor.rsiLen - 3, anchor.rsiLen, anchor.rsiLen + 3, 9, 14, 21}, 1, 200);
-      int[] stochKs = uniqueInts(new int[] {anchor.stochK, 9, 14, 21}, 1, 200);
-      for (int rl : rsiLens) {
-        for (int sk : stochKs) {
-          if (acc.candidates >= maxCand) return;
-          SettingsView c = anchor.copy();
-          c.rsiLen = rl;
-          c.stochK = sk;
-          considerOptimizerCandidate(acc, ctx, s, c, signalIndex, maxCand);
-        }
-      }
-    }
-    // Cross-family bundle 2: SMA + Supertrend together (trend cluster)
-    if (anchor.enableSma && anchor.enableSt && acc.candidates < maxCand) {
-      int[] smaFasts = uniqueInts(new int[] {anchor.smaFast - 3, anchor.smaFast, anchor.smaFast + 3, 5, 8, 13}, 1, 300);
-      double[] stFactors = uniqueDoubles(new double[] {anchor.stFactor, 2.0, 4.0, 6.0}, 0.1, 20.0);
-      for (int sf : smaFasts) {
-        for (double stf : stFactors) {
-          if (acc.candidates >= maxCand) return;
-          SettingsView c = anchor.copy();
-          c.smaFast = sf;
-          c.stFactor = stf;
-          considerOptimizerCandidate(acc, ctx, s, c, signalIndex, maxCand);
-        }
-      }
-    }
-    // Cross-family bundle 3: Risk + Swing together
-    if (acc.candidates < maxCand) {
-      int[] swings = uniqueInts(new int[] {anchor.swingLen - 4, anchor.swingLen, anchor.swingLen + 4, 8, 13, 21}, 2, 50);
-      double[] slMults = uniqueDoubles(new double[] {anchor.slMultEff, 1.0, 1.5, 2.0, 2.5}, 0.5, 5.0);
-      for (int sw : swings) {
-        for (double sl : slMults) {
-          if (acc.candidates >= maxCand) return;
-          SettingsView c = anchor.copy();
-          c.swingLen = sw;
-          c.slMultEff = sl;
-          c.riskPreset = "Custom";
-          considerOptimizerCandidate(acc, ctx, s, c, signalIndex, maxCand);
-        }
-      }
-    }
-  }
 
   private void considerOptimizerCandidate(OptimizerAccumulator acc, DataContext ctx, DataSeries s, SettingsView candidate, int signalIndex, int maxCand) {
     if (acc.candidates >= maxCand) return;
