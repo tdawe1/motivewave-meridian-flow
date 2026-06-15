@@ -65,7 +65,7 @@ import java.util.List;
 )
 public class MeridianFlowForge extends Study
 {
-  static final String VERSION = "v19-balanced-no-modes";
+  static final String VERSION = "v20-tidy-dashboard";
   private static volatile boolean loggedCalculate;
 
   private final MeridianOptimizer optimizer = new MeridianOptimizer();
@@ -957,39 +957,36 @@ public class MeridianFlowForge extends Study
     int row = 0;
     if (cfg.dashboardCompact) {
       rows[row++] = headerRow("MF", VERSION, signal, signalColor);
-      rows[row++] = dashRow("Sig", signal, enabledCount(cfg) + "F " + (cfg.requireAll ? "ALL" : "ANY"), signalColor);
+      rows[row++] = dashRow("Cfg", enabledCount(cfg) + "F " + (cfg.requireAll ? "ALL" : "ANY"), cfg.singleTarget ? "1TP" : "3TP", DashboardFigure.TEXT);
       rows[row++] = dashRow("Run", optimizer.statusValue(), optimizer.statusExtra(), optimizerStatusColor(optimizer.statusKind()));
-      rows[row++] = dashRow("BT", bars + "b/" + stats.trades + "t", formatPct(winRate) + " WR", DashboardFigure.TEXT);
-      rows[row++] = dashRow("PF", formatRatio(profitFactor), "NPF " + formatRatio(netProfitFactor), ratioColor(profitFactor, 1.0));
+      rows[row++] = dashRow("BT", stats.trades + "t " + formatPct(winRate), "PF " + formatRatio(profitFactor), ratioColor(profitFactor, 1.0));
       rows[row++] = dashRow("Net", formatSigned(stats.netPoints), "DD " + formatPoints(stats.maxDrawdownPoints), signedColor(stats.netPoints));
       rows[row++] = dashRow("Tgt", targetStats(stats, cfg), "SL " + stats.stops, stats.stops <= stats.wins ? DashboardFigure.GOOD : DashboardFigure.WARN);
       if (opt != null && opt.stats != null) {
-        rows[row++] = headerRow("Opt", opt.objective + " " + depthLabel(cfg.optimizerDepth), opt.valid ? opt.candidates + "x" : "low trades", opt.valid ? DashboardFigure.GOOD : DashboardFigure.WARN);
-        rows[row++] = dashRow("Rec", parameterSummaryRisk(opt.cfg), optStale ? (cfg.autoApplyOptimizer ? "AUTO" : "APPLY") : "OK", optStale ? DashboardFigure.WARN : DashboardFigure.GOOD);
-        rows[row++] = dashRow("Perf", formatSigned(opt.stats.netPoints), "PF " + formatRatio(MeridianBacktest.profitFactor(opt.stats)) + " DD " + formatPoints(opt.stats.maxDrawdownPoints), signedColor(opt.stats.netPoints));
+        rows[row++] = dashRow("Rec", optStale ? "STALE" : "OK", parameterSummaryRisk(opt.cfg), optStale ? DashboardFigure.WARN : DashboardFigure.GOOD);
+        rows[row++] = dashRow("Opt", formatSigned(opt.stats.netPoints), "PF " + formatRatio(MeridianBacktest.profitFactor(opt.stats)) + " DD " + formatPoints(opt.stats.maxDrawdownPoints), signedColor(opt.stats.netPoints));
       }
     }
     else {
       rows[row++] = headerRow("Meridian Forge", VERSION, signal, signalColor);
-      rows[row++] = dashRow("Signal", signal, enabledCount(cfg) + " filters • " + (cfg.requireAll ? "ALL" : "ANY"), signalColor);
-      rows[row++] = dashRow("Core filters", coreFilterSnapshot(cfg, signalIndex, s.getClose(signalIndex), rsi, stoch, sar), "", DashboardFigure.TEXT);
-      rows[row++] = dashRow("Strategy filters", strategyFilterSnapshot(cfg, signalIndex, tilson, smi), "", DashboardFigure.TEXT);
-      rows[row++] = dashRow("Target mode", cfg.singleTarget ? "Single target" : "Three targets", parameterSummaryRisk(cfg), DashboardFigure.TEXT);
-      rows[row++] = dashRow("Backtest", bars + " bars", stats.trades + " trades", DashboardFigure.TEXT);
-      rows[row++] = dashRow("Win rate", formatPct(winRate), stats.wins + "/" + stats.losses + "/" + stats.breakEvens + " W/L/BE", winRate >= 50.0 ? DashboardFigure.GOOD : DashboardFigure.WARN);
-      rows[row++] = dashRow("Profit factor", formatRatio(profitFactor), "NPF " + formatRatio(netProfitFactor), ratioColor(profitFactor, 1.0));
-      rows[row++] = dashRow("Net points", formatSigned(stats.netPoints), "DD " + formatPoints(stats.maxDrawdownPoints) + " • RF " + formatRatio(recoveryFactor), signedColor(stats.netPoints));
-      rows[row++] = dashRow("Gross W/L", formatSigned(stats.grossWinPoints), formatSigned(stats.grossLossPoints), signedColor(stats.grossWinPoints + stats.grossLossPoints));
-      rows[row++] = dashRow("Stops / targets", stats.stops + " stops", targetStats(stats, cfg), stats.stops <= stats.wins ? DashboardFigure.GOOD : DashboardFigure.WARN);
-      rows[row++] = dashRow("Optimizer state", optimizer.statusValue(), optimizer.statusExtra(), optimizerStatusColor(optimizer.statusKind()));
+      rows[row++] = dashRow("Setup", cfg.signalSource + " • " + cfg.signalMode, enabledCount(cfg) + " filters • " + (cfg.requireAll ? "ALL" : "ANY"), signalColor);
+      String coreFilters = coreFilterSnapshot(cfg, signalIndex, s.getClose(signalIndex), rsi, stoch, sar);
+      String strategyFilters = strategyFilterSnapshot(cfg, signalIndex, tilson, smi);
+      if (!"none".equals(coreFilters) || !"none".equals(strategyFilters)) {
+        String filters = "none".equals(coreFilters) ? strategyFilters : "none".equals(strategyFilters) ? coreFilters : coreFilters + " | " + strategyFilters;
+        rows[row++] = dashRow("Filters", filters, "", DashboardFigure.TEXT);
+      }
+      rows[row++] = dashRow("Risk", cfg.singleTarget ? "Single TP" : "Three TP", parameterSummaryRisk(cfg), DashboardFigure.TEXT);
+      rows[row++] = dashRow("Backtest", stats.trades + " trades • " + formatPct(winRate) + " WR", bars + " bars • PF " + formatRatio(profitFactor) + " • NPF " + formatRatio(netProfitFactor), ratioColor(profitFactor, 1.0));
+      rows[row++] = dashRow("Net/DD", formatSigned(stats.netPoints), "DD " + formatPoints(stats.maxDrawdownPoints) + " • RF " + formatRatio(recoveryFactor), signedColor(stats.netPoints));
+      rows[row++] = dashRow("Targets", targetStats(stats, cfg), "SL " + stats.stops, stats.stops <= stats.wins ? DashboardFigure.GOOD : DashboardFigure.WARN);
+      rows[row++] = dashRow("Optimizer", optimizer.statusValue(), optimizer.statusExtra(), optimizerStatusColor(optimizer.statusKind()));
       if (opt != null && opt.stats != null) {
-        rows[row++] = headerRow("Optimizer", opt.objective + " · " + depthLabel(cfg.optimizerDepth), opt.valid ? opt.candidates + " tries" : "below min trades", opt.valid ? DashboardFigure.GOOD : DashboardFigure.WARN);
-        rows[row++] = dashRow("Apply status", optStale ? "REC OUT OF DATE" : "Current matches rec", optStale ? (cfg.autoApplyOptimizer ? "auto apply pending" : "click Apply") : (cfg.autoApplyOptimizer ? "auto apply on" : ""), optStale ? DashboardFigure.WARN : DashboardFigure.GOOD);
-        rows[row++] = dashRow("Opt stats", formatSigned(opt.stats.netPoints), "PF " + formatRatio(MeridianBacktest.profitFactor(opt.stats)) + " • DD " + formatPoints(opt.stats.maxDrawdownPoints) + " • RF " + formatRatio(MeridianBacktest.recoveryFactor(opt.stats)), signedColor(opt.stats.netPoints));
-        rows[row++] = dashRow("Opt core", parameterSummaryCore(opt.cfg), opt.note == null ? "" : opt.note, DashboardFigure.ACCENT);
-        rows[row++] = dashRow("Opt risk", parameterSummaryRisk(opt.cfg), "", DashboardFigure.ACCENT);
-        String filters = parameterSummaryFilters(opt.cfg, cfg.dashboardHideUnused);
-        if (!filters.isEmpty()) rows[row++] = dashRow("Opt filters", filters, "", DashboardFigure.ACCENT);
+        rows[row++] = headerRow("Recommendation", optStale ? (cfg.autoApplyOptimizer ? "auto pending" : "out of date") : "current", opt.objective + " · " + depthLabel(cfg.optimizerDepth) + " · " + opt.candidates + " tries", optStale ? DashboardFigure.WARN : DashboardFigure.GOOD);
+        rows[row++] = dashRow("Rec risk", parameterSummaryRisk(opt.cfg), opt.note == null ? "" : opt.note, DashboardFigure.ACCENT);
+        String filters = parameterSummaryFilters(opt.cfg, true);
+        if (!filters.isEmpty()) rows[row++] = dashRow("Rec filters", filters, "", DashboardFigure.ACCENT);
+        rows[row++] = dashRow("Opt result", formatSigned(opt.stats.netPoints), "PF " + formatRatio(MeridianBacktest.profitFactor(opt.stats)) + " • DD " + formatPoints(opt.stats.maxDrawdownPoints) + " • RF " + formatRatio(MeridianBacktest.recoveryFactor(opt.stats)), signedColor(opt.stats.netPoints));
       }
     }
     if (stats.activeDir != 0) {
