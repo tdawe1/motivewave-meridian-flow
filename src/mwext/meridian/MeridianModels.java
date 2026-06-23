@@ -95,6 +95,47 @@ final class SignalArrays {
   }
 }
 
+final class TradingBotResult {
+  final boolean[] longSignal;
+  final boolean[] shortSignal;
+  final boolean[] halfTrendLong;
+  final boolean[] halfTrendShort;
+  final boolean[] trendLong;
+  final boolean[] trendShort;
+  final boolean[] tsiCurlLong;
+  final boolean[] tsiCurlShort;
+  final boolean[] ademaLong;
+  final boolean[] ademaShort;
+  final int[] halfTrendDir;
+  final int[] trendDir;
+  final double[] halfTrendLine;
+  final double[] trendLine;
+  final double[] adaptiveEma;
+
+  TradingBotResult(int n) {
+    longSignal = new boolean[n];
+    shortSignal = new boolean[n];
+    halfTrendLong = new boolean[n];
+    halfTrendShort = new boolean[n];
+    trendLong = new boolean[n];
+    trendShort = new boolean[n];
+    tsiCurlLong = new boolean[n];
+    tsiCurlShort = new boolean[n];
+    ademaLong = new boolean[n];
+    ademaShort = new boolean[n];
+    halfTrendDir = new int[n];
+    trendDir = new int[n];
+    halfTrendLine = new double[n];
+    trendLine = new double[n];
+    adaptiveEma = new double[n];
+    for (int i = 0; i < n; i++) {
+      halfTrendLine[i] = Double.NaN;
+      trendLine[i] = Double.NaN;
+      adaptiveEma[i] = Double.NaN;
+    }
+  }
+}
+
 final class ForgeState {
   final boolean longOk;
   final boolean shortOk;

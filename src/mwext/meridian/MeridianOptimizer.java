@@ -12,9 +12,9 @@ import java.util.Map;
 final class MeridianOptimizer {
   static int maxCandidates(String depth) {
     return switch (depth) {
-      case "Deep" -> 2500;
-      case "Medium" -> 1200;
-      default -> 560;
+      case "Deep" -> 1200;
+      case "Medium" -> 500;
+      default -> 180;
     };
    }
    
@@ -24,6 +24,11 @@ final class MeridianOptimizer {
       case "Medium" -> 2;
       default -> 1;
     };
+  }
+
+  static int optimizerPasses(SettingsView cfg) {
+    if (cfg != null && "Around Current".equals(cfg.optimizerSearch)) return 1;
+    return optimizerPasses(cfg == null ? "Fast" : cfg.optimizerDepth);
   }
 
   private String cacheKey = "";
@@ -126,7 +131,8 @@ final class MeridianOptimizer {
     int floor = optimizerRefreshFloor(cfg.optimizerDepth);
     int interval = switch (cfg.optRefreshMode) {
       case "On Demand" -> cfg.autoApplyOptimizer ? floor : Integer.MAX_VALUE;
-      case "Every N Bars" -> Math.max(floor, cfg.optRefreshInterval);
+      case "Every N Bars" -> Math.max(1, cfg.optRefreshInterval);
+      case "Every Bar" -> 1;
       default -> floor;
     };
     if (cache == null) return interval != Integer.MAX_VALUE;
@@ -171,7 +177,7 @@ final class MeridianOptimizer {
       SettingsView seed = cfg.copy();
       String depth = seed.optimizerDepth;
       int maxCand = maxCandidates(depth);
-      int passes = optimizerPasses(depth);
+      int passes = optimizerPasses(seed);
       boolean iterative = "Deep".equals(depth);
 
       // Always evaluate the user's current settings as a baseline candidate.
@@ -224,8 +230,8 @@ final class MeridianOptimizer {
   }
 
   private void scanSwing(OptimizerAccumulator acc, DataContext ctx, DataSeries s, SettingsView anchor, int signalIndex, int maxCand) {
-    int[] values = uniqueInts(new int[] {anchor.swingLen - 6, anchor.swingLen - 4, anchor.swingLen - 2, anchor.swingLen,
-      anchor.swingLen + 2, anchor.swingLen + 4, anchor.swingLen + 6, 8, 13, 21}, 2, 50);
+    int[] values = uniqueInts(new int[] {anchor.swingLen - 4, anchor.swingLen - 2, anchor.swingLen - 1, anchor.swingLen,
+      anchor.swingLen + 1, anchor.swingLen + 2, anchor.swingLen + 4, 3, 5, 8, 13, 21}, 2, 50);
     for (int value : values) {
       if (acc.candidates >= maxCand) return;
       SettingsView c = anchor.copy();
@@ -800,7 +806,8 @@ final class MeridianOptimizer {
     int floor = optimizerRefreshFloor(cfg.optimizerDepth);
     return switch (cfg.optRefreshMode) {
       case "On Demand" -> cfg.autoApplyOptimizer ? floor : Integer.MAX_VALUE;
-      case "Every N Bars" -> Math.max(floor, cfg.optRefreshInterval);
+      case "Every N Bars" -> Math.max(1, cfg.optRefreshInterval);
+      case "Every Bar" -> 1;
       default -> floor;
     };
   }
