@@ -6,8 +6,14 @@ import com.motivewave.platform.sdk.common.Defaults;
 
 import java.awt.Color;
 import java.io.File;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.List;
 
 final class SettingsView {
+  private static final Field[] COPY_FIELDS = copyFields();
+
   int swingLen, obLookback, maxOB;
   int smaFast, smaSlow, rsiLen, macdFast, macdSlow, macdSignal, stLen;
   int stochK, stochD, stochSmooth, bbLen, emaFast, emaSlow, cciLen, adxLen, diLen;
@@ -37,14 +43,14 @@ final class SettingsView {
 
   void read(com.motivewave.platform.sdk.common.Settings st, DataContext ctx) {
     swingLen = st.getInteger(MeridianFlowForge.SWING_LEN, 5);
-    breakOnWick = "Wick".equals(st.getString(MeridianFlowForge.BREAK_SRC, "Wick"));
-    signalMode = st.getString(MeridianFlowForge.SIGNAL_MODE, "BOS + CHoCH");
-    signalSource = st.getString(MeridianFlowForge.SIGNAL_SOURCE, "Structure + Forge");
+    breakOnWick = MeridianOptions.WICK.equals(st.getString(MeridianFlowForge.BREAK_SRC, MeridianOptions.WICK));
+    signalMode = st.getString(MeridianFlowForge.SIGNAL_MODE, SignalModeOption.BOS_CHOCH.label);
+    signalSource = st.getString(MeridianFlowForge.SIGNAL_SOURCE, SignalSourceOption.STRUCTURE_FORGE.label);
     showStruct = st.getBoolean(MeridianFlowForge.SHOW_STRUCT, true);
     showBos = st.getBoolean(MeridianFlowForge.SHOW_BOS, true);
     showOB = st.getBoolean(MeridianFlowForge.SHOW_OB, true);
-    obFrom = st.getString(MeridianFlowForge.OB_FROM, "BOS + CHoCH");
-    obMitWick = "Wick".equals(st.getString(MeridianFlowForge.OB_MIT_SRC, "Wick"));
+    obFrom = st.getString(MeridianFlowForge.OB_FROM, SignalModeOption.BOS_CHOCH.label);
+    obMitWick = MeridianOptions.WICK.equals(st.getString(MeridianFlowForge.OB_MIT_SRC, MeridianOptions.WICK));
     removeMitigated = st.getBoolean(MeridianFlowForge.REMOVE_MIT, false);
     obLookback = st.getInteger(MeridianFlowForge.OB_LOOKBACK, 30);
     maxOB = st.getInteger(MeridianFlowForge.MAX_OB, 8);
@@ -94,18 +100,18 @@ final class SettingsView {
     diLen = st.getInteger(MeridianFlowForge.DI_LEN, 14);
     adxThreshold = st.getDouble(MeridianFlowForge.ADX_THRESHOLD, 20);
     enableTilson = st.getBoolean(MeridianFlowForge.ENABLE_TILSON, false);
-    tilsonInput = st.getString(MeridianFlowForge.TILSON_INPUT, "High");
-    tilsonMethod = st.getString(MeridianFlowForge.TILSON_METHOD, "MEMA");
+    tilsonInput = st.getString(MeridianFlowForge.TILSON_INPUT, MeridianOptions.HIGH);
+    tilsonMethod = st.getString(MeridianFlowForge.TILSON_METHOD, MeridianOptions.MEMA);
     tilsonPeriod = st.getInteger(MeridianFlowForge.TILSON_PERIOD, 12);
     enableSmi = st.getBoolean(MeridianFlowForge.ENABLE_SMI, false);
-    smiInput = st.getString(MeridianFlowForge.SMI_INPUT, "Open");
-    smiMethod = st.getString(MeridianFlowForge.SMI_METHOD, "SMA");
+    smiInput = st.getString(MeridianFlowForge.SMI_INPUT, MeridianOptions.OPEN);
+    smiMethod = st.getString(MeridianFlowForge.SMI_METHOD, MeridianOptions.SMA);
     smiLongPeriod = st.getInteger(MeridianFlowForge.SMI_LONG_PERIOD, 10);
     smiShortPeriod = st.getInteger(MeridianFlowForge.SMI_SHORT_PERIOD, 12);
     smiSignalPeriod = st.getInteger(MeridianFlowForge.SMI_SIGNAL_PERIOD, 6);
     smiTopGuide = st.getDouble(MeridianFlowForge.SMI_TOP_GUIDE, 0.1);
     smiBottomGuide = st.getDouble(MeridianFlowForge.SMI_BOTTOM_GUIDE, -0.1);
-    smiMode = st.getString(MeridianFlowForge.SMI_MODE, "Line vs Signal");
+    smiMode = st.getString(MeridianFlowForge.SMI_MODE, SmiModeOption.LINE_VS_SIGNAL.label);
     enableTradingBot = st.getBoolean(MeridianFlowForge.ENABLE_TRADING_BOT, false);
     tradingBotLongSide = st.getBoolean(MeridianFlowForge.TB_LONG_SIDE, true);
     tradingBotShortSide = st.getBoolean(MeridianFlowForge.TB_SHORT_SIDE, true);
@@ -121,9 +127,9 @@ final class SettingsView {
     tradingBotRsiLen = st.getInteger(MeridianFlowForge.TB_RSI_LEN, 7);
     tradingBotRsiTop = st.getDouble(MeridianFlowForge.TB_RSI_TOP, 45.0);
     tradingBotRsiBot = st.getDouble(MeridianFlowForge.TB_RSI_BOT, 10.0);
-    tradingBotFilter = st.getString(MeridianFlowForge.TB_FILTER, "No Filtering");
+    tradingBotFilter = st.getString(MeridianFlowForge.TB_FILTER, MeridianOptions.NO_FILTERING);
     tradingBotSwing = st.getInteger(MeridianFlowForge.TB_SWING, 5);
-    tradingBotTsiSpeed = st.getString(MeridianFlowForge.TB_TSI_SPEED, "Fast");
+    tradingBotTsiSpeed = st.getString(MeridianFlowForge.TB_TSI_SPEED, MeridianOptions.FAST);
     tradingBotTsiFastLong = st.getInteger(MeridianFlowForge.TB_TSI_FAST_LONG, 25);
     tradingBotTsiFastShort = st.getInteger(MeridianFlowForge.TB_TSI_FAST_SHORT, 5);
     tradingBotTsiFastSignal = st.getInteger(MeridianFlowForge.TB_TSI_FAST_SIGNAL, 14);
@@ -136,27 +142,18 @@ final class SettingsView {
     tp1MultRaw = st.getDouble(MeridianFlowForge.TP1_MULT, 1.0);
     tp2MultRaw = st.getDouble(MeridianFlowForge.TP2_MULT, 2.0);
     tp3MultRaw = st.getDouble(MeridianFlowForge.TP3_MULT, 3.0);
-    riskPreset = st.getString(MeridianFlowForge.RISK_PRESET, "Balanced");
-    tpMode = st.getString(MeridianFlowForge.TP_MODE, "Three Targets");
-    singleTarget = "Single Target".equals(tpMode);
+    riskPreset = st.getString(MeridianFlowForge.RISK_PRESET, MeridianOptions.BALANCED);
+    tpMode = st.getString(MeridianFlowForge.TP_MODE, TakeProfitModeOption.THREE.label);
+    singleTarget = TakeProfitModeOption.isSingle(tpMode);
 
-    switch (riskPreset) {
-      case "Conservative" -> { slMultEff = 2.5; tpEff = 2.0; tp1Eff = 1.0; tp2Eff = 2.0; tp3Eff = 4.0; }
-      case "Aggressive" -> { slMultEff = 1.0; tpEff = 2.5; tp1Eff = 1.5; tp2Eff = 2.5; tp3Eff = 4.0; }
-      case "Scalping" -> { slMultEff = 0.8; tpEff = 1.5; tp1Eff = 0.8; tp2Eff = 1.5; tp3Eff = 2.0; }
-      case "Custom" -> { slMultEff = slMultRaw; tpEff = tpMultRaw; tp1Eff = tp1MultRaw; tp2Eff = tp2MultRaw; tp3Eff = tp3MultRaw; }
-      default -> { slMultEff = 1.5; tpEff = 2.0; tp1Eff = 1.0; tp2Eff = 2.0; tp3Eff = 3.0; }
-    }
-    if (!singleTarget) {
-      if (tp1Eff >= tp2Eff) tp2Eff = tp1Eff + 0.5;
-      if (tp2Eff >= tp3Eff) tp3Eff = tp2Eff + 0.5;
-    }
+    RiskPresetOption.from(riskPreset).apply(this);
+    normalizeTargets();
     showRisk = st.getBoolean(MeridianFlowForge.SHOW_RISK, true);
     useBreakEven = st.getBoolean(MeridianFlowForge.USE_BE, true);
     showAtrTrend = st.getBoolean(MeridianFlowForge.SHOW_ATR_TREND, true);
     showDashboard = st.getBoolean(MeridianFlowForge.SHOW_DASHBOARD, true);
-    dashboardMode = st.getString(MeridianFlowForge.DASHBOARD_MODE, "Full");
-    dashboardCompact = "Compact".equals(dashboardMode);
+    dashboardMode = st.getString(MeridianFlowForge.DASHBOARD_MODE, MeridianOptions.FULL);
+    dashboardCompact = MeridianOptions.COMPACT.equals(dashboardMode);
     dashboardHideUnused = st.getBoolean(MeridianFlowForge.DASHBOARD_HIDE_UNUSED, false);
     dashboardPosPreset = st.getString(MeridianFlowForge.DASHBOARD_POS_PRESET, "Top Left");
     dashboardXOffset = st.getInteger(MeridianFlowForge.DASHBOARD_X_OFFSET, 12);
@@ -173,10 +170,10 @@ final class SettingsView {
     autoApplyOptimizer = st.getBoolean(MeridianFlowForge.AUTO_APPLY_OPTIMIZER, false);
     optimizerLookback = st.getInteger(MeridianFlowForge.OPT_LOOKBACK, 800);
     optimizerMinTrades = st.getInteger(MeridianFlowForge.OPT_MIN_TRADES, 8);
-    optimizerObjective = st.getString(MeridianFlowForge.OPT_OBJECTIVE, "Balanced");
-    optimizerSearch = st.getString(MeridianFlowForge.OPT_SEARCH, "NQ 5/15m Fast");
-    optRefreshMode = st.getString(MeridianFlowForge.OPT_REFRESH_MODE, "Every N Bars");
-    optimizerDepth = st.getString(MeridianFlowForge.OPT_DEPTH, "Fast");
+    optimizerObjective = st.getString(MeridianFlowForge.OPT_OBJECTIVE, MeridianOptions.BALANCED);
+    optimizerSearch = st.getString(MeridianFlowForge.OPT_SEARCH, MeridianOptions.NQ_5_15M_FAST);
+    optRefreshMode = st.getString(MeridianFlowForge.OPT_REFRESH_MODE, OptimizerRefreshOption.EVERY_N_BARS.label);
+    optimizerDepth = st.getString(MeridianFlowForge.OPT_DEPTH, OptimizerDepthOption.FAST.label);
     optRefreshInterval = st.getInteger(MeridianFlowForge.OPT_REFRESH_INTERVAL, 20);
     dashboardLookback = st.getInteger(MeridianFlowForge.DASHBOARD_LOOKBACK, 800);
     atrTrendLen = st.getInteger(MeridianFlowForge.ATR_TREND_LEN, 10);
@@ -197,33 +194,60 @@ final class SettingsView {
 
   SettingsView copy() {
     SettingsView c = new SettingsView();
-    c.swingLen = swingLen; c.obLookback = obLookback; c.maxOB = maxOB;
-    c.smaFast = smaFast; c.smaSlow = smaSlow; c.rsiLen = rsiLen; c.macdFast = macdFast; c.macdSlow = macdSlow; c.macdSignal = macdSignal; c.stLen = stLen;
-    c.stochK = stochK; c.stochD = stochD; c.stochSmooth = stochSmooth; c.bbLen = bbLen; c.emaFast = emaFast; c.emaSlow = emaSlow; c.cciLen = cciLen; c.adxLen = adxLen; c.diLen = diLen;
-    c.tilsonPeriod = tilsonPeriod; c.smiLongPeriod = smiLongPeriod; c.smiShortPeriod = smiShortPeriod; c.smiSignalPeriod = smiSignalPeriod;
-    c.atrRiskLen = atrRiskLen; c.atrTrendLen = atrTrendLen; c.atrSmooth = atrSmooth; c.htfEmaLen = htfEmaLen; c.obAlpha = obAlpha; c.dashboardLookback = dashboardLookback;
-    c.optimizerLookback = optimizerLookback; c.optimizerMinTrades = optimizerMinTrades; c.projectionBars = projectionBars; c.optRefreshInterval = optRefreshInterval;
-    c.dashboardXOffset = dashboardXOffset; c.dashboardYOffset = dashboardYOffset; c.dashboardScale = dashboardScale; c.signalImageSize = signalImageSize; c.signalImageOffset = signalImageOffset;
-    c.tradingBotAmplitude = tradingBotAmplitude; c.tradingBotBbPeriod = tradingBotBbPeriod; c.tradingBotAtrLen = tradingBotAtrLen; c.tradingBotRsiLen = tradingBotRsiLen; c.tradingBotSwing = tradingBotSwing;
-    c.tradingBotTsiFastLong = tradingBotTsiFastLong; c.tradingBotTsiFastShort = tradingBotTsiFastShort; c.tradingBotTsiFastSignal = tradingBotTsiFastSignal; c.tradingBotTsiSlowLong = tradingBotTsiSlowLong; c.tradingBotTsiSlowShort = tradingBotTsiSlowShort; c.tradingBotTsiSlowSignal = tradingBotTsiSlowSignal;
-    c.rsiLong = rsiLong; c.rsiShort = rsiShort; c.stFactor = stFactor; c.bbMult = bbMult; c.sarStart = sarStart; c.sarInc = sarInc; c.sarMax = sarMax; c.cciLong = cciLong; c.cciShort = cciShort; c.adxThreshold = adxThreshold;
-    c.smiTopGuide = smiTopGuide; c.smiBottomGuide = smiBottomGuide;
-    c.slMultEff = slMultEff; c.tpEff = tpEff; c.tp1Eff = tp1Eff; c.tp2Eff = tp2Eff; c.tp3Eff = tp3Eff; c.atrTrendMult = atrTrendMult;
-    c.slMultRaw = slMultRaw; c.tpMultRaw = tpMultRaw; c.tp1MultRaw = tp1MultRaw; c.tp2MultRaw = tp2MultRaw; c.tp3MultRaw = tp3MultRaw;
-    c.tradingBotChannelDeviation = tradingBotChannelDeviation; c.tradingBotBbDeviation = tradingBotBbDeviation; c.tradingBotRsiTop = tradingBotRsiTop; c.tradingBotRsiBot = tradingBotRsiBot;
-    c.breakOnWick = breakOnWick; c.showStruct = showStruct; c.showBos = showBos; c.showOB = showOB; c.obMitWick = obMitWick; c.removeMitigated = removeMitigated; c.obMean = obMean; c.obLabels = obLabels;
-    c.useHtf = useHtf; c.requireAll = requireAll; c.enableSma = enableSma; c.enableRsi = enableRsi; c.enableMacd = enableMacd; c.enableSt = enableSt; c.enableStoch = enableStoch; c.enableBb = enableBb; c.enableEma = enableEma;
-    c.enableAo = enableAo; c.enableSar = enableSar; c.enableCci = enableCci; c.enableAdx = enableAdx; c.enableTilson = enableTilson; c.enableSmi = enableSmi; c.showRisk = showRisk; c.useBreakEven = useBreakEven; c.showAtrTrend = showAtrTrend; c.showDashboard = showDashboard; c.showOptimizer = showOptimizer; c.autoApplyOptimizer = autoApplyOptimizer; c.showProjection = showProjection; c.showSignalImage = showSignalImage; c.dashboardCompact = dashboardCompact; c.dashboardHideUnused = dashboardHideUnused; c.singleTarget = singleTarget;
-    c.enableTradingBot = enableTradingBot; c.tradingBotLongSide = tradingBotLongSide; c.tradingBotShortSide = tradingBotShortSide; c.tradingBotUseHalfTrend = tradingBotUseHalfTrend; c.tradingBotUseTrendLine = tradingBotUseTrendLine; c.tradingBotUseTsiCurl = tradingBotUseTsiCurl; c.tradingBotUseAdema = tradingBotUseAdema;
-    c.alertSl = alertSl; c.alertTp = alertTp; c.alertOb = alertOb;
-    c.signalMode = signalMode; c.obFrom = obFrom; c.signalSource = signalSource; c.riskPreset = riskPreset; c.optimizerObjective = optimizerObjective; c.optimizerSearch = optimizerSearch; c.optRefreshMode = optRefreshMode; c.optimizerDepth = optimizerDepth; c.dashboardMode = dashboardMode; c.tpMode = tpMode;
-    c.tradingBotFilter = tradingBotFilter; c.tradingBotTsiSpeed = tradingBotTsiSpeed;
-    c.dashboardPosPreset = dashboardPosPreset;
-    c.tilsonInput = tilsonInput; c.tilsonMethod = tilsonMethod; c.smiInput = smiInput; c.smiMethod = smiMethod; c.smiMode = smiMode;
-    c.htfBarSize = htfBarSize;
-    c.signalImageFile = signalImageFile;
-    c.bullColor = bullColor; c.bearColor = bearColor; c.obBullColor = obBullColor; c.obBearColor = obBearColor; c.neutralColor = neutralColor;
+    try {
+      for (Field field : COPY_FIELDS) {
+        field.set(c, field.get(this));
+      }
+    }
+    catch (IllegalAccessException e) {
+      throw new IllegalStateException("Unable to copy settings", e);
+    }
     return c;
+  }
+
+  private static Field[] copyFields() {
+    List<Field> fields = new ArrayList<>();
+    for (Field field : SettingsView.class.getDeclaredFields()) {
+      if (!Modifier.isStatic(field.getModifiers())) fields.add(field);
+    }
+    return fields.toArray(new Field[0]);
+  }
+
+  String tuningKey() {
+    StringBuilder b = new StringBuilder(512);
+    appendTuningSettings(b);
+    return b.toString();
+  }
+
+  void appendOptimizerSettings(StringBuilder b) {
+    b.append('|').append(optimizerLookback).append('|').append(optimizerMinTrades).append('|').append(optimizerObjective).append('|').append(optimizerSearch).append('|').append(optimizerDepth);
+    appendTuningSettings(b);
+  }
+
+  void appendTuningSettings(StringBuilder b) {
+    b.append('|').append(swingLen).append('|').append(breakOnWick).append('|').append(signalMode).append('|').append(signalSource);
+    b.append('|').append(useHtf).append('|').append(htfBarSize).append('|').append(htfEmaLen).append('|').append(requireAll);
+    b.append('|').append(enableSma).append('|').append(smaFast).append('|').append(smaSlow);
+    b.append('|').append(enableRsi).append('|').append(rsiLen).append('|').append(rsiLong).append('|').append(rsiShort);
+    b.append('|').append(enableMacd).append('|').append(macdFast).append('|').append(macdSlow).append('|').append(macdSignal);
+    b.append('|').append(enableSt).append('|').append(stLen).append('|').append(stFactor);
+    b.append('|').append(enableStoch).append('|').append(stochK).append('|').append(stochD).append('|').append(stochSmooth);
+    b.append('|').append(enableBb).append('|').append(bbLen).append('|').append(bbMult);
+    b.append('|').append(enableEma).append('|').append(emaFast).append('|').append(emaSlow);
+    b.append('|').append(enableAo).append('|').append(enableSar).append('|').append(sarStart).append('|').append(sarInc).append('|').append(sarMax);
+    b.append('|').append(enableCci).append('|').append(cciLen).append('|').append(cciLong).append('|').append(cciShort);
+    b.append('|').append(enableAdx).append('|').append(diLen).append('|').append(adxLen).append('|').append(adxThreshold);
+    b.append('|').append(enableTilson).append('|').append(tilsonInput).append('|').append(tilsonMethod).append('|').append(tilsonPeriod);
+    b.append('|').append(enableSmi).append('|').append(smiInput).append('|').append(smiMethod).append('|').append(smiLongPeriod).append('|').append(smiShortPeriod).append('|').append(smiSignalPeriod)
+      .append('|').append(smiTopGuide).append('|').append(smiBottomGuide).append('|').append(smiMode);
+    b.append('|').append(atrRiskLen).append('|').append(slMultEff).append('|').append(tpEff).append('|').append(tp1Eff).append('|').append(tp2Eff).append('|').append(tp3Eff).append('|').append(riskPreset).append('|').append(tpMode).append('|').append(singleTarget).append('|').append(useBreakEven);
+  }
+
+  void normalizeTargets() {
+    if (!singleTarget) {
+      if (tp1Eff >= tp2Eff) tp2Eff = tp1Eff + 0.5;
+      if (tp2Eff >= tp3Eff) tp3Eff = tp2Eff + 0.5;
+    }
   }
 
 }

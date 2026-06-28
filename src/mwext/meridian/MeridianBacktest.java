@@ -128,10 +128,10 @@ final class MeridianBacktest {
     double pf = boundedRatio(profitFactor(stats), 10.0);
     double rf = boundedRatio(recoveryFactor(stats), 10.0);
     return switch (cfg.optimizerObjective) {
-      case "Net Points" -> stats.netPoints + pf;
-      case "Profit Factor" -> pf * 1000.0 + stats.netPoints;
-      case "PF vs Max DD" -> pf * 900.0 + rf * 350.0 + stats.netPoints * 0.15 - stats.maxDrawdownPoints * 8.0;
-      case "Recovery Factor" -> rf * 1000.0 + stats.netPoints;
+      case MeridianOptions.NET_POINTS -> stats.netPoints + pf;
+      case MeridianOptions.PROFIT_FACTOR -> pf * 1000.0 + stats.netPoints;
+      case MeridianOptions.PF_VS_MAX_DD -> pf * 900.0 + rf * 350.0 + stats.netPoints * 0.15 - stats.maxDrawdownPoints * 8.0;
+      case MeridianOptions.RECOVERY_FACTOR -> rf * 1000.0 + stats.netPoints;
       default -> stats.netPoints - stats.maxDrawdownPoints * 0.75 + Math.min(pf, 5.0) * 20.0 + Math.min(rf, 10.0) * 15.0;
     };
   }
@@ -148,6 +148,18 @@ final class MeridianBacktest {
     return Math.max(200, Math.max(cfg.swingLen * 6, indicatorWarmup * 3));
   }
 
+  /**
+   * Determines whether a take-profit target is hit before a stop-loss on the same bar.
+   *
+   * Without tick data, the intrabar path is approximated by assuming:
+   *   - Bullish candle (close >= open): open → low → high → close
+   *   - Bearish candle (close < open):  open → high → low → close
+   *
+   * The rationale: the wick opposite to the body direction is more likely to have formed first,
+   * since the body direction represents the dominant momentum into the close.
+   *
+   * Returns true if target is hit first, false if stop is hit first or the path is indeterminate.
+   */
   static boolean targetHitBeforeStop(int dir, double open, double high, double low, double close, double stop, double target) {
     if (dir == 0 || !finite(stop) || !finite(target)) return false;
     boolean targetHit = dir > 0 ? high >= target : low <= target;

@@ -4,21 +4,21 @@ import java.lang.reflect.Method;
 
 public final class OptimizerRefreshTest {
   public static void main(String[] args) throws Exception {
-    assertInterval("Every Bar", "Fast", false, 20, 1);
-    assertInterval("Every N Bars", "Deep", false, 3, 3);
-    assertInterval("On Demand", "Fast", false, 20, Integer.MAX_VALUE);
-    assertInterval("On Demand", "Fast", true, 20, 8);
+    assertInterval(OptimizerRefreshOption.EVERY_BAR.label, MeridianOptions.FAST, false, 20, 1);
+    assertInterval(OptimizerRefreshOption.EVERY_N_BARS.label, MeridianOptions.DEEP, false, 3, 3);
+    assertInterval(OptimizerRefreshOption.ON_DEMAND.label, MeridianOptions.FAST, false, 20, Integer.MAX_VALUE);
+    assertInterval(OptimizerRefreshOption.ON_DEMAND.label, MeridianOptions.FAST, true, 20, 8);
 
-    assertEquals(180, MeridianOptimizer.maxCandidates("Fast"), "fast candidate cap");
-    assertEquals(500, MeridianOptimizer.maxCandidates("Medium"), "medium candidate cap");
-    assertEquals(1200, MeridianOptimizer.maxCandidates("Deep"), "deep candidate cap");
+    assertEquals(180, MeridianOptimizer.maxCandidates(MeridianOptions.FAST), "fast candidate cap");
+    assertEquals(500, MeridianOptimizer.maxCandidates(MeridianOptions.MEDIUM), "medium candidate cap");
+    assertEquals(1200, MeridianOptimizer.maxCandidates(MeridianOptions.DEEP), "deep candidate cap");
 
-    SettingsView aroundCurrent = cfg("Every N Bars", "Deep", false, 20);
-    aroundCurrent.optimizerSearch = "Around Current";
+    SettingsView aroundCurrent = cfg(OptimizerRefreshOption.EVERY_N_BARS.label, MeridianOptions.DEEP, false, 20);
+    aroundCurrent.optimizerSearch = MeridianOptions.AROUND_CURRENT;
     assertEquals(1, MeridianOptimizer.optimizerPasses(aroundCurrent), "around-current passes");
 
-    SettingsView deep = cfg("Every N Bars", "Deep", false, 20);
-    deep.optimizerSearch = "NQ 5/15m Fast";
+    SettingsView deep = cfg(OptimizerRefreshOption.EVERY_N_BARS.label, MeridianOptions.DEEP, false, 20);
+    deep.optimizerSearch = MeridianOptions.NQ_5_15M_FAST;
     assertEquals(3, MeridianOptimizer.optimizerPasses(deep), "deep passes");
   }
 
@@ -33,7 +33,7 @@ public final class OptimizerRefreshTest {
     cfg.optimizerDepth = depth;
     cfg.autoApplyOptimizer = autoApply;
     cfg.optRefreshInterval = everyN;
-    cfg.optimizerSearch = "NQ 5/15m Fast";
+    cfg.optimizerSearch = MeridianOptions.NQ_5_15M_FAST;
     return cfg;
   }
 

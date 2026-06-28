@@ -72,6 +72,8 @@ public class MeridianFlowForge extends Study
 
   private final MeridianOptimizer optimizer = new MeridianOptimizer();
   private volatile String calculationCacheKey = "";
+  private volatile String indicatorCacheKey = "";
+  private MeridianIndicatorCache indicatorCache;
   private volatile DashboardFigure lastDashboardFigure;
   private volatile SettingsView lastDashboardCfg;
   private volatile int lastDashboardSignalIndex = -1;
@@ -261,17 +263,17 @@ public class MeridianFlowForge extends Study
     SettingTab structure = sd.addTab("Structure");
     SettingGroup sg = structure.addGroup("Structure");
     sg.addRow(new IntegerDescriptor(SWING_LEN, "Swing Length", 5, 2, 50, 1));
-    sg.addRow(new DiscreteDescriptor(BREAK_SRC, "Break Confirmation", "Wick", opts("Close", "Wick")));
-    sg.addRow(new DiscreteDescriptor(SIGNAL_MODE, "Signal Mode", "BOS + CHoCH", opts("BOS + CHoCH", "CHoCH only", "BOS only")));
-    sg.addRow(new DiscreteDescriptor(SIGNAL_SOURCE, "Confirmed Signal Source", "Structure + Forge", opts("Structure + Forge", "Structure only", "Forge only")));
+    sg.addRow(new DiscreteDescriptor(BREAK_SRC, "Break Confirmation", MeridianOptions.WICK, opts(MeridianOptions.CLOSE, MeridianOptions.WICK)));
+    sg.addRow(new DiscreteDescriptor(SIGNAL_MODE, "Signal Mode", SignalModeOption.BOS_CHOCH.label, opts(SignalModeOption.labels())));
+    sg.addRow(new DiscreteDescriptor(SIGNAL_SOURCE, "Confirmed Signal Source", SignalSourceOption.STRUCTURE_FORGE.label, opts(SignalSourceOption.labels())));
     sg.addRow(new BooleanDescriptor(SHOW_STRUCT, "Show HH/HL/LH/LL", true));
     sg.addRow(new BooleanDescriptor(SHOW_BOS, "Show BOS/CHoCH", true));
 
     SettingTab obTab = sd.addTab("Order Blocks");
     SettingGroup og = obTab.addGroup("Suggested Order Blocks");
     og.addRow(new BooleanDescriptor(SHOW_OB, "Show Order Blocks", true));
-    og.addRow(new DiscreteDescriptor(OB_FROM, "Create OB On", "BOS + CHoCH", opts("BOS + CHoCH", "CHoCH only", "BOS only")));
-    og.addRow(new DiscreteDescriptor(OB_MIT_SRC, "Mitigation Trigger", "Wick", opts("Wick", "Close")));
+    og.addRow(new DiscreteDescriptor(OB_FROM, "Create OB On", SignalModeOption.BOS_CHOCH.label, opts(SignalModeOption.labels())));
+    og.addRow(new DiscreteDescriptor(OB_MIT_SRC, "Mitigation Trigger", MeridianOptions.WICK, opts(MeridianOptions.WICK, MeridianOptions.CLOSE)));
     og.addRow(new BooleanDescriptor(REMOVE_MIT, "Remove OB After Mitigation", false));
     og.addRow(new IntegerDescriptor(OB_LOOKBACK, "OB Lookback (bars)", 30, 3, 100, 1));
     og.addRow(new IntegerDescriptor(MAX_OB, "Max Order Blocks", 8, 1, 30, 1));
@@ -327,17 +329,17 @@ public class MeridianFlowForge extends Study
 
     SettingGroup strategyFilters = filters.addGroup("Strategy Filters");
     strategyFilters.addRow(new BooleanDescriptor(ENABLE_TILSON, "Enable Tilson IE/2", false),
-      new DiscreteDescriptor(TILSON_INPUT, "Source", "High", opts("Close", "Open", "High", "Low", "HL2", "HLC3")),
-      new DiscreteDescriptor(TILSON_METHOD, "Method", "MEMA", opts("SMA", "EMA", "MEMA")),
+      new DiscreteDescriptor(TILSON_INPUT, "Source", MeridianOptions.HIGH, opts(MeridianOptions.PRICE_SOURCES)),
+      new DiscreteDescriptor(TILSON_METHOD, "Method", MeridianOptions.MEMA, opts(MeridianOptions.MA_METHODS)),
       new IntegerDescriptor(TILSON_PERIOD, "Period", 12, 2, 200, 1));
     strategyFilters.addRow(new BooleanDescriptor(ENABLE_SMI, "Enable SMI Ergodic", false),
-      new DiscreteDescriptor(SMI_INPUT, "Source", "Open", opts("Close", "Open", "High", "Low", "HL2", "HLC3")),
-      new DiscreteDescriptor(SMI_METHOD, "Method", "SMA", opts("SMA", "EMA", "MEMA")),
+      new DiscreteDescriptor(SMI_INPUT, "Source", MeridianOptions.OPEN, opts(MeridianOptions.PRICE_SOURCES)),
+      new DiscreteDescriptor(SMI_METHOD, "Method", MeridianOptions.SMA, opts(MeridianOptions.MA_METHODS)),
       new IntegerDescriptor(SMI_LONG_PERIOD, "Long", 10, 1, 200, 1),
       new IntegerDescriptor(SMI_SHORT_PERIOD, "Short", 12, 1, 200, 1),
       new IntegerDescriptor(SMI_SIGNAL_PERIOD, "Signal", 6, 1, 100, 1));
-    strategyFilters.addRow(new DiscreteDescriptor(SMI_MODE, "SMI Mode", "Line vs Signal",
-      opts("Line vs Signal", "Zero Bias", "Guided Reversal")),
+    strategyFilters.addRow(new DiscreteDescriptor(SMI_MODE, "SMI Mode", SmiModeOption.LINE_VS_SIGNAL.label,
+      opts(SmiModeOption.labels())),
       new DoubleDescriptor(SMI_TOP_GUIDE, "Top Guide", 0.1, -10.0, 10.0, 0.1),
       new DoubleDescriptor(SMI_BOTTOM_GUIDE, "Bottom Guide", -0.1, -10.0, 10.0, 0.1));
 
@@ -352,8 +354,8 @@ public class MeridianFlowForge extends Study
     tbCore.addRow(new BooleanDescriptor(TB_USE_TRENDLINE, "Bollinger TrendLine", true),
       new IntegerDescriptor(TB_BB_PERIOD, "Sensitivity", 100, 5, 600, 5),
       new DoubleDescriptor(TB_BB_DEVIATION, "Offset", 1.5, 0.01, 10.0, 0.01));
-    tbCore.addRow(new DiscreteDescriptor(TB_FILTER, "Flat Filtering", "No Filtering",
-      opts("No Filtering", "ATR", "RSI", "ATR or RSI", "ATR and RSI", "Flat only")),
+    tbCore.addRow(new DiscreteDescriptor(TB_FILTER, "Flat Filtering", MeridianOptions.NO_FILTERING,
+      opts(MeridianOptions.NO_FILTERING, "ATR", "RSI", "ATR or RSI", "ATR and RSI", "Flat only")),
       new IntegerDescriptor(TB_ATR_LEN, "ATR Length", 5, 1, 100, 1),
       new IntegerDescriptor(TB_RSI_LEN, "RSI Length", 7, 1, 100, 1),
       new DoubleDescriptor(TB_RSI_TOP, "RSI Top", 45.0, 1.0, 99.0, 0.5),
@@ -361,7 +363,7 @@ public class MeridianFlowForge extends Study
     SettingGroup tbExtras = tradingBot.addGroup("TradingBot Extras");
     tbExtras.addRow(new BooleanDescriptor(TB_USE_TSI_CURL, "TSI Pivot Curl", false),
       new IntegerDescriptor(TB_SWING, "Swing High/Low", 5, 2, 100, 1),
-      new DiscreteDescriptor(TB_TSI_SPEED, "TSI Speed", "Fast", opts("Fast", "Slow")));
+      new DiscreteDescriptor(TB_TSI_SPEED, "TSI Speed", MeridianOptions.FAST, opts(MeridianOptions.FAST, MeridianOptions.SLOW)));
     tbExtras.addRow(new IntegerDescriptor(TB_TSI_FAST_LONG, "Fast Long", 25, 1, 200, 1),
       new IntegerDescriptor(TB_TSI_FAST_SHORT, "Fast Short", 5, 1, 200, 1),
       new IntegerDescriptor(TB_TSI_FAST_SIGNAL, "Fast Signal", 14, 1, 200, 1));
@@ -372,8 +374,8 @@ public class MeridianFlowForge extends Study
 
     SettingTab risk = sd.addTab("Risk");
     SettingGroup rg = risk.addGroup("Risk Management");
-    rg.addRow(new DiscreteDescriptor(RISK_PRESET, "Risk Preset", "Balanced", opts("Conservative", "Balanced", "Aggressive", "Scalping", "Custom")));
-    rg.addRow(new DiscreteDescriptor(TP_MODE, "Take Profit Mode", "Three Targets", opts("Single Target", "Three Targets")));
+    rg.addRow(new DiscreteDescriptor(RISK_PRESET, "Risk Preset", MeridianOptions.BALANCED, opts(RiskPresetOption.labels())));
+    rg.addRow(new DiscreteDescriptor(TP_MODE, "Take Profit Mode", TakeProfitModeOption.THREE.label, opts(TakeProfitModeOption.labels())));
     rg.addRow(new IntegerDescriptor(ATR_RISK_LEN, "ATR Length (SL)", 13, 5, 50, 1));
     rg.addRow(new DoubleDescriptor(SL_MULT, "SL x ATR (Custom)", 1.5, 0.5, 5.0, 0.1),
       new DoubleDescriptor(TP_MULT, "Single TP x Risk (Custom)", 2.0, 0.5, 15.0, 0.1));
@@ -390,18 +392,18 @@ public class MeridianFlowForge extends Study
       new BooleanDescriptor(AUTO_APPLY_OPTIMIZER, "Automatically Apply Recommendations", false));
     optg.addRow(new IntegerDescriptor(OPT_LOOKBACK, "Optimization Lookback Bars", 800, 200, 50000, 100),
       new IntegerDescriptor(OPT_MIN_TRADES, "Minimum Trades", 8, 1, 200, 1));
-    optg.addRow(new DiscreteDescriptor(OPT_OBJECTIVE, "Objective", "Balanced",
-      opts("Balanced", "Net Points", "Profit Factor", "PF vs Max DD", "Recovery Factor")));
-    optg.addRow(new DiscreteDescriptor(OPT_SEARCH, "Search Profile", "NQ 5/15m Fast", opts("NQ 5/15m Fast", "Around Current")));
-    optg.addRow(new DiscreteDescriptor(OPT_REFRESH_MODE, "Refresh Mode", "Every N Bars",
-      opts("On Demand", "Every N Bars", "Every Bar")),
+    optg.addRow(new DiscreteDescriptor(OPT_OBJECTIVE, "Objective", MeridianOptions.BALANCED,
+      opts(MeridianOptions.BALANCED, MeridianOptions.NET_POINTS, MeridianOptions.PROFIT_FACTOR, MeridianOptions.PF_VS_MAX_DD, MeridianOptions.RECOVERY_FACTOR)));
+    optg.addRow(new DiscreteDescriptor(OPT_SEARCH, "Search Profile", MeridianOptions.NQ_5_15M_FAST, opts(MeridianOptions.NQ_5_15M_FAST, MeridianOptions.AROUND_CURRENT)));
+    optg.addRow(new DiscreteDescriptor(OPT_REFRESH_MODE, "Refresh Mode", OptimizerRefreshOption.EVERY_N_BARS.label,
+      opts(OptimizerRefreshOption.labels())),
       new IntegerDescriptor(OPT_REFRESH_INTERVAL, "Refresh Every N Bars", 20, 1, 500, 1));
-    optg.addRow(new DiscreteDescriptor(OPT_DEPTH, "Optimizer Depth", "Fast", opts("Fast", "Medium", "Deep")));
+    optg.addRow(new DiscreteDescriptor(OPT_DEPTH, "Optimizer Depth", OptimizerDepthOption.FAST.label, opts(OptimizerDepthOption.labels())));
 
     SettingTab visual = sd.addTab("Visual");
     SettingGroup vg = visual.addGroup("Display");
     vg.addRow(new BooleanDescriptor(SHOW_DASHBOARD, "Show Live Backtest Dashboard", true),
-      new DiscreteDescriptor(DASHBOARD_MODE, "Dashboard Mode", "Full", opts("Full", "Compact")),
+      new DiscreteDescriptor(DASHBOARD_MODE, "Dashboard Mode", MeridianOptions.FULL, opts(MeridianOptions.FULL, MeridianOptions.COMPACT)),
       new BooleanDescriptor(DASHBOARD_HIDE_UNUSED, "Hide Unused Dashboard Items", false));
     vg.addRow(new DiscreteDescriptor(DASHBOARD_POS_PRESET, "Dashboard Position", "Top Left",
       opts("Top Left", "Top Right", "Bottom Left", "Bottom Right", "Custom")));
@@ -531,26 +533,28 @@ public class MeridianFlowForge extends Study
     beginFigureUpdate();
     clearFigures();
 
-    boolean needsForge = !"Structure only".equals(cfg.signalSource);
+    SignalSourceOption signalSource = SignalSourceOption.from(cfg.signalSource);
+    boolean needsForge = signalSource.usesForge();
     boolean needsDashboardFilters = cfg.showDashboard && !cfg.dashboardCompact;
-    double[] closes = closeArray(s);
-    double[] smaFast = needsForge && cfg.enableSma ? sma(closes, cfg.smaFast) : null;
-    double[] smaSlow = needsForge && cfg.enableSma ? sma(closes, cfg.smaSlow) : null;
-    double[] emaFast = needsForge && cfg.enableEma ? ema(closes, cfg.emaFast) : null;
-    double[] emaSlow = needsForge && cfg.enableEma ? ema(closes, cfg.emaSlow) : null;
-    double[] rsi = (needsForge || needsDashboardFilters) && cfg.enableRsi ? rsi(s, cfg.rsiLen) : null;
-    Macd macd = needsForge && cfg.enableMacd ? macd(s, cfg.macdFast, cfg.macdSlow, cfg.macdSignal) : null;
-    Stoch stoch = (needsForge || needsDashboardFilters) && cfg.enableStoch ? stoch(s, cfg.stochK, cfg.stochD, cfg.stochSmooth) : null;
-    Bands bb = needsForge && cfg.enableBb ? bollinger(closes, cfg.bbLen, cfg.bbMult) : null;
-    double[] ao = needsForge && cfg.enableAo ? ao(s) : null;
-    double[] cci = needsForge && cfg.enableCci ? cci(s, cfg.cciLen) : null;
-    Adx adx = needsForge && cfg.enableAdx ? adx(s, cfg.diLen, cfg.adxLen) : null;
-    Sar sar = (needsForge || needsDashboardFilters) && cfg.enableSar ? sar(s, cfg.sarStart, cfg.sarInc, cfg.sarMax) : null;
-    Tilson tilson = (needsForge || needsDashboardFilters) && cfg.enableTilson ? tilson(s, cfg.tilsonInput, cfg.tilsonMethod, cfg.tilsonPeriod) : null;
-    Smi smi = (needsForge || needsDashboardFilters) && cfg.enableSmi ? smi(s, cfg.smiInput, cfg.smiMethod, cfg.smiLongPeriod, cfg.smiShortPeriod, cfg.smiSignalPeriod) : null;
-    Super superTrend = needsForge && cfg.enableSt ? superTrend(s, cfg.stLen, cfg.stFactor) : null;
-    double[] atrRisk = atr(s, cfg.atrRiskLen);
-    double[] atrTrendSmooth = cfg.showAtrTrend ? ema(atr(s, cfg.atrTrendLen), cfg.atrSmooth) : null;
+    MeridianIndicatorCache inputs = indicatorInputs(ctx, s, cfg, signalIndex, marketIndex);
+    double[] closes = inputs.closes;
+    double[] smaFast = needsForge && cfg.enableSma ? inputs.sma(cfg.smaFast) : null;
+    double[] smaSlow = needsForge && cfg.enableSma ? inputs.sma(cfg.smaSlow) : null;
+    double[] emaFast = needsForge && cfg.enableEma ? inputs.ema(cfg.emaFast) : null;
+    double[] emaSlow = needsForge && cfg.enableEma ? inputs.ema(cfg.emaSlow) : null;
+    double[] rsi = (needsForge || needsDashboardFilters) && cfg.enableRsi ? inputs.rsi(cfg.rsiLen) : null;
+    Macd macd = needsForge && cfg.enableMacd ? inputs.macd(cfg.macdFast, cfg.macdSlow, cfg.macdSignal) : null;
+    Stoch stoch = (needsForge || needsDashboardFilters) && cfg.enableStoch ? inputs.stoch(cfg.stochK, cfg.stochD, cfg.stochSmooth) : null;
+    Bands bb = needsForge && cfg.enableBb ? inputs.bollinger(cfg.bbLen, cfg.bbMult) : null;
+    double[] ao = needsForge && cfg.enableAo ? inputs.ao() : null;
+    double[] cci = needsForge && cfg.enableCci ? inputs.cci(cfg.cciLen) : null;
+    Adx adx = needsForge && cfg.enableAdx ? inputs.adx(cfg.diLen, cfg.adxLen) : null;
+    Sar sar = (needsForge || needsDashboardFilters) && cfg.enableSar ? inputs.sar(cfg.sarStart, cfg.sarInc, cfg.sarMax) : null;
+    Tilson tilson = (needsForge || needsDashboardFilters) && cfg.enableTilson ? inputs.tilson(cfg.tilsonInput, cfg.tilsonMethod, cfg.tilsonPeriod) : null;
+    Smi smi = (needsForge || needsDashboardFilters) && cfg.enableSmi ? inputs.smi(cfg.smiInput, cfg.smiMethod, cfg.smiLongPeriod, cfg.smiShortPeriod, cfg.smiSignalPeriod) : null;
+    Super superTrend = needsForge && cfg.enableSt ? inputs.superTrend(cfg.stLen, cfg.stFactor) : null;
+    double[] atrRisk = inputs.atr(cfg.atrRiskLen);
+    double[] atrTrendSmooth = cfg.showAtrTrend ? inputs.atrTrend(cfg.atrTrendLen, cfg.atrSmooth) : null;
     TradingBotResult tradingBot = cfg.enableTradingBot ? TradingBotEngine.calculate(s, cfg) : null;
 
     boolean[] forgeLong = new boolean[n];
@@ -567,7 +571,7 @@ public class MeridianFlowForge extends Study
       }
     }
 
-    HtfBias htfBias = buildHtfBias(cfg, ctx, s, n);
+    HtfBias htfBias = inputs.htfBias(cfg);
 
     int warmup = Math.max(cfg.swingLen * 2, 50);
     double lastSwingHigh = Double.NaN;
@@ -703,14 +707,14 @@ public class MeridianFlowForge extends Study
       boolean htfBearOk = !cfg.useHtf || htfBias.bear[i];
       boolean forgeLongRising = forgeLong[i] && (i == 0 || !forgeLong[i - 1]);
       boolean forgeShortRising = forgeShort[i] && (i == 0 || !forgeShort[i - 1]);
-      boolean openLongSignal = switch (cfg.signalSource) {
-        case "Structure only" -> bullEvent && htfBullOk;
-        case "Forge only" -> forgeLongRising && htfBullOk;
+      boolean openLongSignal = switch (signalSource) {
+        case STRUCTURE_ONLY -> bullEvent && htfBullOk;
+        case FORGE_ONLY -> forgeLongRising && htfBullOk;
         default -> bullEvent && htfBullOk && forgeLong[i];
       };
-      boolean openShortSignal = switch (cfg.signalSource) {
-        case "Structure only" -> bearEvent && htfBearOk;
-        case "Forge only" -> forgeShortRising && htfBearOk;
+      boolean openShortSignal = switch (signalSource) {
+        case STRUCTURE_ONLY -> bearEvent && htfBearOk;
+        case FORGE_ONLY -> forgeShortRising && htfBearOk;
         default -> bearEvent && htfBearOk && forgeShort[i];
       };
       if (tradingBot != null && i < tradingBot.longSignal.length) {
@@ -961,8 +965,9 @@ public class MeridianFlowForge extends Study
     double stopDistance = atr * cfg.slMultEff;
     if (stopDistance <= 0.0) return null;
 
-    boolean usesStructure = !"Forge only".equals(cfg.signalSource);
-    boolean usesForge = !"Structure only".equals(cfg.signalSource);
+    SignalSourceOption signalSource = SignalSourceOption.from(cfg.signalSource);
+    boolean usesStructure = signalSource.usesStructure();
+    boolean usesForge = signalSource.usesForge();
     boolean htfLong = !cfg.useHtf || (htfBias != null && signalIndex < htfBias.bull.length && htfBias.bull[signalIndex]);
     boolean htfShort = !cfg.useHtf || (htfBias != null && signalIndex < htfBias.bear.length && htfBias.bear[signalIndex]);
     boolean forgeLongNow = forgeLong != null && signalIndex < forgeLong.length && forgeLong[signalIndex];
@@ -1126,10 +1131,11 @@ public class MeridianFlowForge extends Study
     boolean htfShortNow = !cfg.useHtf || (htfBias != null && stateIndex < htfBias.bear.length && htfBias.bear[stateIndex]);
     double breakHighSrc = cfg.breakOnWick ? s.getHigh(stateIndex) : s.getClose(stateIndex);
     double breakLowSrc = cfg.breakOnWick ? s.getLow(stateIndex) : s.getClose(stateIndex);
+    SignalSourceOption signalSource = SignalSourceOption.from(cfg.signalSource);
     String signal = dashboardStateLabel(longSignalNow, shortSignalNow, projection, structTrend,
       breakHighSrc, breakLowSrc, lastSwingHigh, lastSwingLow, swingHighBroken, swingLowBroken,
       forgeLongNow, forgeShortNow, htfLongNow, htfShortNow,
-      !"Forge only".equals(cfg.signalSource), !"Structure only".equals(cfg.signalSource));
+      signalSource.usesStructure(), signalSource.usesForge());
     Color signalColor = dashboardStateColor(signal, cfg);
     double winRate = stats.trades == 0 ? 0.0 : 100.0 * stats.wins / stats.trades;
     double profitFactor = MeridianBacktest.profitFactor(stats);
@@ -1367,11 +1373,7 @@ public class MeridianFlowForge extends Study
   }
 
   private static boolean eventAllowed(String mode, boolean bos, boolean choch) {
-    return switch (mode) {
-      case "CHoCH only" -> choch;
-      case "BOS only" -> bos;
-      default -> bos || choch;
-    };
+    return SignalModeOption.eventAllowed(mode, bos, choch);
   }
 
   private static boolean isPivotHigh(DataSeries s, int pivot, int len) {
@@ -1460,34 +1462,65 @@ public class MeridianFlowForge extends Study
     }
   }
 
-  private HtfBias buildHtfBias(SettingsView cfg, DataContext ctx, DataSeries base, int n) {
-
-    boolean[] bull = new boolean[n];
-    boolean[] bear = new boolean[n];
-    if (!cfg.useHtf) {
-      Arrays.fill(bull, true);
-      Arrays.fill(bear, true);
-      return new HtfBias(bull, bear);
-    }
-    DataSeries htf = ctx.getDataSeries(cfg.htfBarSize);
-    if (htf == null || htf.size() < cfg.htfEmaLen + 2) return new HtfBias(bull, bear);
-    double[] htfEma = ema(htf, cfg.htfEmaLen);
-    for (int i = 0; i < n; i++) {
-      int hi = htf.findIndex(base.getStartTime(i));
-      if (hi > 0) hi -= 1;
-      if (hi < 0 || hi >= htfEma.length || Double.isNaN(htfEma[hi])) continue;
-      double htfClose = htf.getClose(hi);
-      bull[i] = htfClose >= htfEma[hi];
-      bear[i] = htfClose <= htfEma[hi];
-    }
-    return new HtfBias(bull, bear);
-  }
   private static TradeLines snapshot(int dir, int entryIndex, int endIndex, double entry, double sl, double tp1, double tp2, double tp3,
                                      boolean tp1Hit, boolean tp2Hit, boolean tp3Hit, boolean beActive) {
     TradeLines t = new TradeLines();
     t.dir = dir; t.entryIndex = entryIndex; t.endIndex = endIndex; t.entry = entry; t.sl = sl; t.tp1 = tp1; t.tp2 = tp2; t.tp3 = tp3;
     t.tp1Hit = tp1Hit; t.tp2Hit = tp2Hit; t.tp3Hit = tp3Hit; t.beActive = beActive;
     return t;
+  }
+
+  private MeridianIndicatorCache indicatorInputs(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex, int marketIndex) {
+    String key = indicatorDataKey(ctx, s, cfg, signalIndex, marketIndex);
+    MeridianIndicatorCache cache = indicatorCache;
+    if (cache == null || !key.equals(indicatorCacheKey)) {
+      cache = new MeridianIndicatorCache(ctx, s);
+      indicatorCache = cache;
+      indicatorCacheKey = key;
+    }
+    return cache;
+  }
+
+  private static String indicatorDataKey(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex, int marketIndex) {
+    StringBuilder b = new StringBuilder(240);
+    b.append(s.getBarSize()).append('|').append(s.size());
+    if (s.size() > 0) {
+      b.append('|').append(s.getStartTime(0));
+      appendBarSig(b, s, Math.max(0, Math.min(s.size() - 1, signalIndex)));
+      appendBarSig(b, s, Math.max(0, Math.min(s.size() - 1, marketIndex)));
+    }
+    if (cfg.useHtf) {
+      DataSeries htf = ctx.getDataSeries(cfg.htfBarSize);
+      b.append("|htf|").append(cfg.htfBarSize);
+      if (htf == null) b.append("|null");
+      else {
+        b.append('|').append(htf.size());
+        if (htf.size() > 0) {
+          b.append('|').append(htf.getStartTime(0));
+          appendMappedBarSig(b, s, htf, signalIndex);
+          appendMappedBarSig(b, s, htf, marketIndex);
+          appendBarSig(b, htf, htf.size() - 1);
+        }
+      }
+    }
+    return b.toString();
+  }
+
+  private static void appendMappedBarSig(StringBuilder b, DataSeries base, DataSeries mapped, int baseIndex) {
+    int safeBaseIndex = Math.max(0, Math.min(base.size() - 1, baseIndex));
+    int mappedIndex = mapped.findIndex(base.getStartTime(safeBaseIndex));
+    if (mappedIndex > 0) mappedIndex -= 1;
+    if (mappedIndex < 0 || mappedIndex >= mapped.size()) {
+      b.append("|-1");
+      return;
+    }
+    appendBarSig(b, mapped, mappedIndex);
+  }
+
+  private static void appendBarSig(StringBuilder b, DataSeries s, int index) {
+    b.append('|').append(index).append('|').append(s.getStartTime(index)).append('|').append(s.getOpen(index))
+      .append('|').append(s.getHigh(index)).append('|').append(s.getLow(index)).append('|').append(s.getClose(index))
+      .append('|').append(s.isBarComplete(index));
   }
 
   private static int latestCompleteIndex(DataSeries s) {

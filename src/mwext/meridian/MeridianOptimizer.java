@@ -6,36 +6,34 @@ import com.motivewave.platform.sdk.common.DataContext;
 import com.motivewave.platform.sdk.common.DataSeries;
 
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 
 final class MeridianOptimizer {
   static int maxCandidates(String depth) {
     return switch (depth) {
-      case "Deep" -> 1200;
-      case "Medium" -> 500;
+      case MeridianOptions.DEEP -> 1200;
+      case MeridianOptions.MEDIUM -> 500;
       default -> 180;
     };
    }
    
   static int optimizerPasses(String depth) {
     return switch (depth) {
-      case "Deep" -> 3;
-      case "Medium" -> 2;
+      case MeridianOptions.DEEP -> 3;
+      case MeridianOptions.MEDIUM -> 2;
       default -> 1;
     };
   }
 
   static int optimizerPasses(SettingsView cfg) {
-    if (cfg != null && "Around Current".equals(cfg.optimizerSearch)) return 1;
-    return optimizerPasses(cfg == null ? "Fast" : cfg.optimizerDepth);
+    if (cfg != null && MeridianOptions.AROUND_CURRENT.equals(cfg.optimizerSearch)) return 1;
+    return optimizerPasses(cfg == null ? OptimizerDepthOption.FAST.label : cfg.optimizerDepth);
   }
 
   private String cacheKey = "";
   private OptimizerResult cache;
   private int lastComputeBar = -1;
   private String cachePlanKey = "";
-  private OptimizerInputs activeInputs;
+  private MeridianIndicatorCache activeInputs;
   private String statusValue = "OFF";
   private String statusExtra = "optimizer disabled";
   private int statusKind;
@@ -70,11 +68,11 @@ final class MeridianOptimizer {
     }
     String planKey = optimizerPlanKey(s, cfg);
     boolean planMatches = cache != null && planKey.equals(cachePlanKey);
-    if (cache == null && "On Demand".equals(cfg.optRefreshMode) && !cfg.autoApplyOptimizer) {
+    if (cache == null && OptimizerRefreshOption.ON_DEMAND.label.equals(cfg.optRefreshMode) && !cfg.autoApplyOptimizer) {
       setStatus("READY", "click Apply to run", 3);
       return null;
     }
-    if (cache != null && !planMatches && "On Demand".equals(cfg.optRefreshMode) && !cfg.autoApplyOptimizer) {
+    if (cache != null && !planMatches && OptimizerRefreshOption.ON_DEMAND.label.equals(cfg.optRefreshMode) && !cfg.autoApplyOptimizer) {
       setStatus("STALE", "settings changed; click Apply", 2);
       return cache;
     }
@@ -130,9 +128,9 @@ final class MeridianOptimizer {
   private boolean shouldRecompute(SettingsView cfg, int signalIndex) {
     int floor = optimizerRefreshFloor(cfg.optimizerDepth);
     int interval = switch (cfg.optRefreshMode) {
-      case "On Demand" -> cfg.autoApplyOptimizer ? floor : Integer.MAX_VALUE;
-      case "Every N Bars" -> Math.max(1, cfg.optRefreshInterval);
-      case "Every Bar" -> 1;
+      case MeridianOptions.ON_DEMAND -> cfg.autoApplyOptimizer ? floor : Integer.MAX_VALUE;
+      case MeridianOptions.EVERY_N_BARS -> Math.max(1, cfg.optRefreshInterval);
+      case MeridianOptions.EVERY_BAR -> 1;
       default -> floor;
     };
     if (cache == null) return interval != Integer.MAX_VALUE;
@@ -141,8 +139,8 @@ final class MeridianOptimizer {
 
   private static int optimizerRefreshFloor(String depth) {
     return switch (depth) {
-      case "Deep" -> 50;
-      case "Medium" -> 20;
+      case MeridianOptions.DEEP -> 50;
+      case MeridianOptions.MEDIUM -> 20;
       default -> 8;
     };
   }
@@ -170,15 +168,15 @@ final class MeridianOptimizer {
   }
 
   private OptimizerResult runOptimizer(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex) {
-    OptimizerInputs priorInputs = activeInputs;
-    activeInputs = new OptimizerInputs(ctx, s);
+    MeridianIndicatorCache priorInputs = activeInputs;
+    activeInputs = new MeridianIndicatorCache(ctx, s);
     try {
       OptimizerAccumulator acc = new OptimizerAccumulator();
       SettingsView seed = cfg.copy();
       String depth = seed.optimizerDepth;
       int maxCand = maxCandidates(depth);
       int passes = optimizerPasses(seed);
-      boolean iterative = "Deep".equals(depth);
+      boolean iterative = OptimizerDepthOption.DEEP.label.equals(depth);
 
       // Always evaluate the user's current settings as a baseline candidate.
       considerOptimizerCandidate(acc, ctx, s, seed, signalIndex, maxCand);
@@ -322,8 +320,8 @@ final class MeridianOptimizer {
     if (!anchor.enableTilson) return;
     int[] periods = uniqueInts(new int[] {anchor.tilsonPeriod - 3, anchor.tilsonPeriod - 1, anchor.tilsonPeriod,
       anchor.tilsonPeriod + 1, anchor.tilsonPeriod + 3, 7, 9, 10, 12}, 2, 200);
-    String[] inputs = uniqueStrings(anchor.tilsonInput, "High", "Close", "Open");
-    String[] methods = uniqueStrings(anchor.tilsonMethod, "MEMA", "SMA", "EMA");
+    String[] inputs = uniqueStrings(anchor.tilsonInput, MeridianOptions.HIGH, MeridianOptions.CLOSE, MeridianOptions.OPEN);
+    String[] methods = uniqueStrings(anchor.tilsonMethod, MeridianOptions.MEMA, MeridianOptions.SMA, MeridianOptions.EMA);
     for (String input : inputs) {
       for (String method : methods) {
         for (int period : periods) {
@@ -349,9 +347,9 @@ final class MeridianOptimizer {
       {7, 11, 7},
       {14, 5, 5}
     };
-    String[] inputs = uniqueStrings(anchor.smiInput, "Open", "Close");
-    String[] methods = uniqueStrings(anchor.smiMethod, "SMA", "EMA", "MEMA");
-    String[] modes = uniqueStrings(anchor.smiMode, "Line vs Signal", "Zero Bias");
+    String[] inputs = uniqueStrings(anchor.smiInput, MeridianOptions.OPEN, MeridianOptions.CLOSE);
+    String[] methods = uniqueStrings(anchor.smiMethod, MeridianOptions.SMA, MeridianOptions.EMA, MeridianOptions.MEMA);
+    String[] modes = uniqueStrings(anchor.smiMode, SmiModeOption.LINE_VS_SIGNAL.label, SmiModeOption.ZERO_BIAS.label);
     for (String input : inputs) {
       for (String method : methods) {
         for (String mode : modes) {
@@ -383,7 +381,7 @@ final class MeridianOptimizer {
     for (double[] profile : profiles) {
       if (acc.candidates >= maxCand) return;
       SettingsView c = anchor.copy();
-      c.riskPreset = "Custom";
+      c.riskPreset = RiskPresetOption.CUSTOM.label;
       c.atrRiskLen = (int)profile[0];
       c.slMultEff = profile[1];
       c.tpEff = profile[2];
@@ -402,7 +400,7 @@ final class MeridianOptimizer {
     if (candidate.enableMacd && candidate.macdFast >= candidate.macdSlow) return;
     acc.candidates++;
     int signalStart = MeridianBacktest.optimizerSignalStart(signalIndex, candidate);
-    OptimizerInputs inputs = activeInputs;
+    MeridianIndicatorCache inputs = activeInputs;
     SignalArrays signals = inputs == null
       ? buildOptimizationSignals(ctx, s, candidate, signalIndex, signalStart)
       : buildOptimizationSignals(inputs, candidate, signalIndex, signalStart);
@@ -420,16 +418,17 @@ final class MeridianOptimizer {
   }
 
   SignalArrays buildOptimizationSignals(DataContext ctx, DataSeries s, SettingsView cfg, int signalIndex, int startIndex) {
-    return buildOptimizationSignals(new OptimizerInputs(ctx, s), cfg, signalIndex, startIndex);
+    return buildOptimizationSignals(new MeridianIndicatorCache(ctx, s), cfg, signalIndex, startIndex);
   }
 
-  private SignalArrays buildOptimizationSignals(OptimizerInputs inputs, SettingsView cfg, int signalIndex, int startIndex) {
+  private SignalArrays buildOptimizationSignals(MeridianIndicatorCache inputs, SettingsView cfg, int signalIndex, int startIndex) {
     DataSeries s = inputs.s;
     int n = inputs.n;
     int evalStart = Math.max(0, startIndex);
     int scanStart = Math.max(0, evalStart - MeridianBacktest.optimizerWarmupBars(cfg));
     double[] closes = inputs.closes;
-    boolean needsForge = !"Structure only".equals(cfg.signalSource);
+    SignalSourceOption source = SignalSourceOption.from(cfg.signalSource);
+    boolean needsForge = source.usesForge();
     double[] smaFast = needsForge && cfg.enableSma ? inputs.sma(cfg.smaFast) : null;
     double[] smaSlow = needsForge && cfg.enableSma ? inputs.sma(cfg.smaSlow) : null;
     double[] emaFast = needsForge && cfg.enableEma ? inputs.ema(cfg.emaFast) : null;
@@ -511,14 +510,14 @@ final class MeridianOptimizer {
       }
       boolean forgeLongRising = forgeLong && !prevForgeLong;
       boolean forgeShortRising = forgeShort && !prevForgeShort;
-      longs[i] = switch (cfg.signalSource) {
-        case "Structure only" -> bullEvent && htfBullOk;
-        case "Forge only" -> forgeLongRising && htfBullOk;
+      longs[i] = switch (source) {
+        case STRUCTURE_ONLY -> bullEvent && htfBullOk;
+        case FORGE_ONLY -> forgeLongRising && htfBullOk;
         default -> bullEvent && htfBullOk && forgeLong;
       };
-      shorts[i] = switch (cfg.signalSource) {
-        case "Structure only" -> bearEvent && htfBearOk;
-        case "Forge only" -> forgeShortRising && htfBearOk;
+      shorts[i] = switch (source) {
+        case STRUCTURE_ONLY -> bearEvent && htfBearOk;
+        case FORGE_ONLY -> forgeShortRising && htfBearOk;
         default -> bearEvent && htfBearOk && forgeShort;
       };
 
@@ -551,35 +550,15 @@ final class MeridianOptimizer {
       b.append('|').append(s.getOpen(signalIndex)).append('|').append(s.getHigh(signalIndex))
         .append('|').append(s.getLow(signalIndex)).append('|').append(s.getClose(signalIndex));
     }
-    appendOptimizerSettings(b, cfg);
+    cfg.appendOptimizerSettings(b);
     return b.toString();
   }
 
   static String optimizerPlanKey(DataSeries s, SettingsView cfg) {
     StringBuilder b = new StringBuilder(512);
     b.append(s.getBarSize()).append('|').append(s.size() == 0 ? 0L : s.getStartTime(0));
-    appendOptimizerSettings(b, cfg);
+    cfg.appendOptimizerSettings(b);
     return b.toString();
-  }
-
-  private static void appendOptimizerSettings(StringBuilder b, SettingsView cfg) {
-    b.append('|').append(cfg.optimizerLookback).append('|').append(cfg.optimizerMinTrades).append('|').append(cfg.optimizerObjective).append('|').append(cfg.optimizerSearch).append('|').append(cfg.optimizerDepth);
-    b.append('|').append(cfg.swingLen).append('|').append(cfg.breakOnWick).append('|').append(cfg.signalMode).append('|').append(cfg.signalSource);
-    b.append('|').append(cfg.useHtf).append('|').append(cfg.htfBarSize).append('|').append(cfg.htfEmaLen).append('|').append(cfg.requireAll);
-    b.append('|').append(cfg.enableSma).append('|').append(cfg.smaFast).append('|').append(cfg.smaSlow);
-    b.append('|').append(cfg.enableRsi).append('|').append(cfg.rsiLen).append('|').append(cfg.rsiLong).append('|').append(cfg.rsiShort);
-    b.append('|').append(cfg.enableMacd).append('|').append(cfg.macdFast).append('|').append(cfg.macdSlow).append('|').append(cfg.macdSignal);
-    b.append('|').append(cfg.enableSt).append('|').append(cfg.stLen).append('|').append(cfg.stFactor);
-    b.append('|').append(cfg.enableStoch).append('|').append(cfg.stochK).append('|').append(cfg.stochD).append('|').append(cfg.stochSmooth);
-    b.append('|').append(cfg.enableBb).append('|').append(cfg.bbLen).append('|').append(cfg.bbMult);
-    b.append('|').append(cfg.enableEma).append('|').append(cfg.emaFast).append('|').append(cfg.emaSlow);
-    b.append('|').append(cfg.enableAo).append('|').append(cfg.enableSar).append('|').append(cfg.sarStart).append('|').append(cfg.sarInc).append('|').append(cfg.sarMax);
-    b.append('|').append(cfg.enableCci).append('|').append(cfg.cciLen).append('|').append(cfg.cciLong).append('|').append(cfg.cciShort);
-    b.append('|').append(cfg.enableAdx).append('|').append(cfg.diLen).append('|').append(cfg.adxLen).append('|').append(cfg.adxThreshold);
-    b.append('|').append(cfg.enableTilson).append('|').append(cfg.tilsonInput).append('|').append(cfg.tilsonMethod).append('|').append(cfg.tilsonPeriod);
-    b.append('|').append(cfg.enableSmi).append('|').append(cfg.smiInput).append('|').append(cfg.smiMethod).append('|').append(cfg.smiLongPeriod).append('|').append(cfg.smiShortPeriod).append('|').append(cfg.smiSignalPeriod)
-      .append('|').append(cfg.smiTopGuide).append('|').append(cfg.smiBottomGuide).append('|').append(cfg.smiMode);
-    b.append('|').append(cfg.atrRiskLen).append('|').append(cfg.slMultEff).append('|').append(cfg.tpEff).append('|').append(cfg.tp1Eff).append('|').append(cfg.tp2Eff).append('|').append(cfg.tp3Eff).append('|').append(cfg.riskPreset).append('|').append(cfg.tpMode).append('|').append(cfg.singleTarget).append('|').append(cfg.useBreakEven);
   }
 
   static void applyOptimizerSettings(com.motivewave.platform.sdk.common.Settings st, SettingsView c) {
@@ -589,7 +568,7 @@ final class MeridianOptimizer {
     st.setString(MeridianFlowForge.RISK_PRESET, c.riskPreset);
     st.setString(MeridianFlowForge.TP_MODE, c.tpMode);
     st.setInteger(MeridianFlowForge.ATR_RISK_LEN, c.atrRiskLen);
-    if ("Custom".equals(c.riskPreset)) {
+    if (RiskPresetOption.CUSTOM.label.equals(c.riskPreset)) {
       st.setDouble(MeridianFlowForge.SL_MULT, c.slMultEff);
       st.setDouble(MeridianFlowForge.TP_MULT, c.tpEff);
       st.setDouble(MeridianFlowForge.TP1_MULT, c.tp1Eff);
@@ -679,37 +658,8 @@ final class MeridianOptimizer {
     return Arrays.copyOf(tmp, count);
   }
 
-  // --- Delegates to MeridianFlowForge helpers (same package, no access issues) ---
-
-  private static HtfBias buildHtfBias(SettingsView cfg, DataContext ctx, DataSeries base, int n) {
-    // Mirrors MeridianFlowForge.buildHtfBias for optimizer signal building.
-    boolean[] bull = new boolean[n];
-    boolean[] bear = new boolean[n];
-    if (!cfg.useHtf) {
-      Arrays.fill(bull, true);
-      Arrays.fill(bear, true);
-      return new HtfBias(bull, bear);
-    }
-    DataSeries htf = ctx.getDataSeries(cfg.htfBarSize);
-    if (htf == null || htf.size() < cfg.htfEmaLen + 2) return new HtfBias(bull, bear);
-    double[] htfEma = ema(htf, cfg.htfEmaLen);
-    for (int i = 0; i < n; i++) {
-      int hi = htf.findIndex(base.getStartTime(i));
-      if (hi > 0) hi -= 1;
-      if (hi < 0 || hi >= htfEma.length || Double.isNaN(htfEma[hi])) continue;
-      double htfClose = htf.getClose(hi);
-      bull[i] = htfClose >= htfEma[hi];
-      bear[i] = htfClose <= htfEma[hi];
-    }
-    return new HtfBias(bull, bear);
-  }
-
   private static boolean eventAllowed(String mode, boolean bos, boolean choch) {
-    return switch (mode) {
-      case "CHoCH only" -> choch;
-      case "BOS only" -> bos;
-      default -> bos || choch;
-    };
+    return SignalModeOption.eventAllowed(mode, bos, choch);
   }
 
   private static boolean isPivotHigh(DataSeries s, int pivot, int len) {
@@ -743,9 +693,9 @@ final class MeridianOptimizer {
   private int refreshInterval(SettingsView cfg) {
     int floor = optimizerRefreshFloor(cfg.optimizerDepth);
     return switch (cfg.optRefreshMode) {
-      case "On Demand" -> cfg.autoApplyOptimizer ? floor : Integer.MAX_VALUE;
-      case "Every N Bars" -> Math.max(1, cfg.optRefreshInterval);
-      case "Every Bar" -> 1;
+      case MeridianOptions.ON_DEMAND -> cfg.autoApplyOptimizer ? floor : Integer.MAX_VALUE;
+      case MeridianOptions.EVERY_N_BARS -> Math.max(1, cfg.optRefreshInterval);
+      case MeridianOptions.EVERY_BAR -> 1;
       default -> floor;
     };
   }
@@ -755,144 +705,6 @@ final class MeridianOptimizer {
     statusExtra = extra == null ? "" : extra;
     statusKind = kind;
   }
-  private static final class OptimizerInputs {
-    final DataContext ctx;
-    final DataSeries s;
-    final int n;
-    final double[] closes;
-    private double[] ao;
-    private final Map<Integer, double[]> sma = new HashMap<>();
-    private final Map<Integer, double[]> ema = new HashMap<>();
-    private final Map<Integer, double[]> rsi = new HashMap<>();
-    private final Map<Integer, double[]> cci = new HashMap<>();
-    private final Map<Integer, double[]> atr = new HashMap<>();
-    private final Map<Long, Macd> macd = new HashMap<>();
-    private final Map<Long, Stoch> stoch = new HashMap<>();
-    private final Map<String, Bands> bands = new HashMap<>();
-    private final Map<String, Sar> sar = new HashMap<>();
-    private final Map<Long, Adx> adx = new HashMap<>();
-    private final Map<String, Super> superTrend = new HashMap<>();
-    private final Map<String, Tilson> tilson = new HashMap<>();
-    private final Map<String, Smi> smi = new HashMap<>();
-    private final Map<String, HtfBias> htf = new HashMap<>();
-
-    OptimizerInputs(DataContext ctx, DataSeries s) {
-      this.ctx = ctx;
-      this.s = s;
-      this.n = s.size();
-      this.closes = closeArray(s);
-    }
-
-    double[] sma(int len) {
-      double[] out = sma.get(len);
-      if (out == null) { out = MeridianIndicators.sma(closes, len); sma.put(len, out); }
-      return out;
-    }
-
-    double[] ema(int len) {
-      double[] out = ema.get(len);
-      if (out == null) { out = MeridianIndicators.ema(closes, len); ema.put(len, out); }
-      return out;
-    }
-
-    double[] rsi(int len) {
-      double[] out = rsi.get(len);
-      if (out == null) { out = MeridianIndicators.rsi(s, len); rsi.put(len, out); }
-      return out;
-    }
-
-    Macd macd(int fast, int slow, int sig) {
-      long key = key(fast, slow, sig);
-      Macd out = macd.get(key);
-      if (out == null) { out = MeridianIndicators.macd(s, fast, slow, sig); macd.put(key, out); }
-      return out;
-    }
-
-    Stoch stoch(int kLen, int dLen, int smooth) {
-      long key = key(kLen, dLen, smooth);
-      Stoch out = stoch.get(key);
-      if (out == null) { out = MeridianIndicators.stoch(s, kLen, dLen, smooth); stoch.put(key, out); }
-      return out;
-    }
-
-    Bands bollinger(int len, double mult) {
-      String key = len + "|" + mult;
-      Bands out = bands.get(key);
-      if (out == null) { out = MeridianIndicators.bollinger(closes, len, mult); bands.put(key, out); }
-      return out;
-    }
-
-    double[] ao() {
-      if (ao == null) ao = MeridianIndicators.ao(s);
-      return ao;
-    }
-
-    Sar sar(double start, double inc, double max) {
-      String key = start + "|" + inc + "|" + max;
-      Sar out = sar.get(key);
-      if (out == null) { out = MeridianIndicators.sar(s, start, inc, max); sar.put(key, out); }
-      return out;
-    }
-
-    double[] cci(int len) {
-      double[] out = cci.get(len);
-      if (out == null) { out = MeridianIndicators.cci(s, len); cci.put(len, out); }
-      return out;
-    }
-
-    Adx adx(int diLen, int adxLen) {
-      long key = key(diLen, adxLen);
-      Adx out = adx.get(key);
-      if (out == null) { out = MeridianIndicators.adx(s, diLen, adxLen); adx.put(key, out); }
-      return out;
-    }
-
-    Super superTrend(int len, double factor) {
-      String key = len + "|" + factor;
-      Super out = superTrend.get(key);
-      if (out == null) { out = MeridianIndicators.superTrend(s, len, factor); superTrend.put(key, out); }
-      return out;
-    }
-
-    Tilson tilson(String input, String method, int period) {
-      String key = input + "|" + method + "|" + period;
-      Tilson out = tilson.get(key);
-      if (out == null) { out = MeridianIndicators.tilson(s, input, method, period); tilson.put(key, out); }
-      return out;
-    }
-
-    Smi smi(String input, String method, int longPeriod, int shortPeriod, int signalPeriod) {
-      String key = input + "|" + method + "|" + longPeriod + "|" + shortPeriod + "|" + signalPeriod;
-      Smi out = smi.get(key);
-      if (out == null) { out = MeridianIndicators.smi(s, input, method, longPeriod, shortPeriod, signalPeriod); smi.put(key, out); }
-      return out;
-    }
-
-    double[] atr(int len) {
-      double[] out = atr.get(len);
-      if (out == null) { out = MeridianIndicators.atr(s, len); atr.put(len, out); }
-      return out;
-    }
-
-    HtfBias htfBias(SettingsView cfg) {
-      String key = cfg.useHtf + "|" + cfg.htfBarSize + "|" + cfg.htfEmaLen;
-      HtfBias out = htf.get(key);
-      if (out == null) { out = buildHtfBias(cfg, ctx, s, n); htf.put(key, out); }
-      return out;
-    }
-
-    private static long key(int a, int b) {
-      return (((long)a) << 32) ^ (b & 0xffffffffL);
-    }
-
-    private static long key(int a, int b, int c) {
-      long h = 1469598103934665603L;
-      h = (h ^ a) * 1099511628211L;
-      h = (h ^ b) * 1099511628211L;
-      return (h ^ c) * 1099511628211L;
-    }
-  }
-
   private static String parameterSummary(SettingsView cfg) {
     String filters = DashboardSupport.parameterSummaryFilters(cfg, true);
     return DashboardSupport.parameterSummaryCore(cfg) + " | " + DashboardSupport.parameterSummaryRisk(cfg) + (filters.isEmpty() ? "" : " | " + filters);

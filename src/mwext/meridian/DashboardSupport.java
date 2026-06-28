@@ -27,9 +27,9 @@ final class DashboardSupport {
 
   static String depthLabel(String depth) {
     return switch (depth) {
-      case "Deep" -> "Deep";
-      case "Medium" -> "Med";
-      default -> "Fast";
+      case MeridianOptions.DEEP -> MeridianOptions.DEEP;
+      case MeridianOptions.MEDIUM -> "Med";
+      default -> MeridianOptions.FAST;
     };
   }
 
@@ -69,37 +69,7 @@ final class DashboardSupport {
 
   static boolean sameTuning(SettingsView a, SettingsView b) {
     if (a == null || b == null) return false;
-    return a.swingLen == b.swingLen && a.breakOnWick == b.breakOnWick
-      && a.atrRiskLen == b.atrRiskLen && a.useBreakEven == b.useBreakEven
-      && a.useHtf == b.useHtf && eq(a.htfBarSize, b.htfBarSize) && a.htfEmaLen == b.htfEmaLen
-      && a.requireAll == b.requireAll
-      && a.enableSma == b.enableSma && a.smaFast == b.smaFast && a.smaSlow == b.smaSlow
-      && a.enableRsi == b.enableRsi && a.rsiLen == b.rsiLen
-      && near(a.rsiLong, b.rsiLong) && near(a.rsiShort, b.rsiShort)
-      && a.enableMacd == b.enableMacd && a.macdFast == b.macdFast && a.macdSlow == b.macdSlow
-      && a.macdSignal == b.macdSignal
-      && a.enableSt == b.enableSt && a.stLen == b.stLen && near(a.stFactor, b.stFactor)
-      && a.enableStoch == b.enableStoch && a.stochK == b.stochK && a.stochD == b.stochD
-      && a.stochSmooth == b.stochSmooth
-      && a.enableBb == b.enableBb && a.bbLen == b.bbLen && near(a.bbMult, b.bbMult)
-      && a.enableEma == b.enableEma && a.emaFast == b.emaFast && a.emaSlow == b.emaSlow
-      && a.enableAo == b.enableAo
-      && a.enableSar == b.enableSar && near(a.sarStart, b.sarStart) && near(a.sarInc, b.sarInc)
-      && near(a.sarMax, b.sarMax)
-      && a.enableCci == b.enableCci && a.cciLen == b.cciLen
-      && near(a.cciLong, b.cciLong) && near(a.cciShort, b.cciShort)
-      && a.enableAdx == b.enableAdx && a.diLen == b.diLen && a.adxLen == b.adxLen
-      && near(a.adxThreshold, b.adxThreshold)
-      && a.enableTilson == b.enableTilson && a.tilsonPeriod == b.tilsonPeriod
-      && a.enableSmi == b.enableSmi && a.smiLongPeriod == b.smiLongPeriod
-      && a.smiShortPeriod == b.smiShortPeriod && a.smiSignalPeriod == b.smiSignalPeriod
-      && near(a.smiTopGuide, b.smiTopGuide) && near(a.smiBottomGuide, b.smiBottomGuide)
-      && near(a.slMultEff, b.slMultEff) && near(a.tpEff, b.tpEff) && near(a.tp1Eff, b.tp1Eff)
-      && near(a.tp2Eff, b.tp2Eff) && near(a.tp3Eff, b.tp3Eff) && a.singleTarget == b.singleTarget
-      && eq(a.signalMode, b.signalMode) && eq(a.signalSource, b.signalSource)
-      && eq(a.riskPreset, b.riskPreset) && eq(a.tpMode, b.tpMode)
-      && eq(a.tilsonInput, b.tilsonInput) && eq(a.tilsonMethod, b.tilsonMethod)
-      && eq(a.smiInput, b.smiInput) && eq(a.smiMethod, b.smiMethod) && eq(a.smiMode, b.smiMode);
+    return a.tuningKey().equals(b.tuningKey());
   }
 
   static String coreFilterSnapshot(SettingsView cfg, int i, double close, double[] rsi, Stoch stoch, Sar sar) {
@@ -175,14 +145,6 @@ final class DashboardSupport {
   static String formatPrice(double v) {
     if (Double.isNaN(v)) return "n/a";
     return Util.formatDouble(v, 2);
-  }
-
-  private static boolean near(double a, double b) {
-    return Math.abs(a - b) < 0.0000001;
-  }
-
-  private static boolean eq(Object a, Object b) {
-    return a == null ? b == null : a.equals(b);
   }
 
   private static String side(boolean longOk, boolean shortOk) {

@@ -1,6 +1,9 @@
 package mwext.meridian;
 
+import com.motivewave.platform.sdk.common.DataContext;
 import com.motivewave.platform.sdk.common.DataSeries;
+
+import java.util.Arrays;
 
 final class MeridianIndicators {
   private MeridianIndicators() {}
@@ -14,12 +17,12 @@ final class MeridianIndicators {
   static double[] sourceArray(DataSeries s, String source) {
     double[] out = new double[s.size()];
     for (int i = 0; i < out.length; i++) {
-      out[i] = switch (source == null ? "Close" : source) {
-        case "Open" -> s.getOpen(i);
-        case "High" -> s.getHigh(i);
-        case "Low" -> s.getLow(i);
-        case "HL2" -> (s.getHigh(i) + s.getLow(i)) / 2.0;
-        case "HLC3" -> (s.getHigh(i) + s.getLow(i) + s.getClose(i)) / 3.0;
+      out[i] = switch (source == null ? MeridianOptions.CLOSE : source) {
+        case MeridianOptions.OPEN -> s.getOpen(i);
+        case MeridianOptions.HIGH -> s.getHigh(i);
+        case MeridianOptions.LOW -> s.getLow(i);
+        case MeridianOptions.HL2 -> (s.getHigh(i) + s.getLow(i)) / 2.0;
+        case MeridianOptions.HLC3 -> (s.getHigh(i) + s.getLow(i) + s.getClose(i)) / 3.0;
         default -> s.getClose(i);
       };
     }
@@ -27,8 +30,8 @@ final class MeridianIndicators {
   }
 
   static double[] maSeries(String method, double[] v, int len) {
-    if ("EMA".equals(method)) return emaWithNa(v, len, 2.0 / (len + 1.0));
-    if ("MEMA".equals(method)) return emaWithNa(v, len, 1.0 / len);
+    if (MeridianOptions.EMA.equals(method)) return emaWithNa(v, len, 2.0 / (len + 1.0));
+    if (MeridianOptions.MEMA.equals(method)) return emaWithNa(v, len, 1.0 / len);
     return sma(v, len);
   }
 
@@ -384,11 +387,11 @@ final class MeridianIndicators {
       boolean smiReady = smi != null && !Double.isNaN(smi.value[i]) && !Double.isNaN(smi.signal[i]);
       boolean smiLong = smiReady && smi.value[i] > smi.signal[i];
       boolean smiShort = smiReady && smi.value[i] < smi.signal[i];
-      if ("Zero Bias".equals(c.smiMode)) {
+      if (SmiModeOption.ZERO_BIAS.label.equals(c.smiMode)) {
         smiLong = smiLong && smi.value[i] > 0.0;
         smiShort = smiShort && smi.value[i] < 0.0;
       }
-      else if ("Guided Reversal".equals(c.smiMode)) {
+      else if (SmiModeOption.GUIDED_REVERSAL.label.equals(c.smiMode)) {
         smiLong = smiReady && smi.crossAbove[i] && smi.value[i] < c.smiBottomGuide;
         smiShort = smiReady && smi.crossBelow[i] && smi.value[i] > c.smiTopGuide;
       }
@@ -396,6 +399,28 @@ final class MeridianIndicators {
       shortCond = merge(c.requireAll, shortCond, smiShort);
     }
     return any ? new ForgeState(longCond, shortCond) : new ForgeState(false, false);
+  }
+
+  static HtfBias htfBias(SettingsView cfg, DataContext ctx, DataSeries base, int n) {
+    boolean[] bull = new boolean[n];
+    boolean[] bear = new boolean[n];
+    if (!cfg.useHtf) {
+      Arrays.fill(bull, true);
+      Arrays.fill(bear, true);
+      return new HtfBias(bull, bear);
+    }
+    DataSeries htf = ctx.getDataSeries(cfg.htfBarSize);
+    if (htf == null || htf.size() < cfg.htfEmaLen + 2) return new HtfBias(bull, bear);
+    double[] htfEma = ema(htf, cfg.htfEmaLen);
+    for (int i = 0; i < n; i++) {
+      int hi = htf.findIndex(base.getStartTime(i));
+      if (hi > 0) hi -= 1;
+      if (hi < 0 || hi >= htfEma.length || Double.isNaN(htfEma[hi])) continue;
+      double htfClose = htf.getClose(hi);
+      bull[i] = htfClose >= htfEma[hi];
+      bear[i] = htfClose <= htfEma[hi];
+    }
+    return new HtfBias(bull, bear);
   }
 
   static double[] atr(DataSeries s, int len) {
