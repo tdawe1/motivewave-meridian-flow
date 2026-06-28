@@ -72,6 +72,63 @@ final class DashboardSupport {
     return a.tuningKey().equals(b.tuningKey());
   }
 
+  static String stateLabel(boolean longSignal, boolean shortSignal, Projection projection,
+                           int structTrend, double breakHighSrc, double breakLowSrc,
+                           double lastSwingHigh, double lastSwingLow,
+                           boolean swingHighBroken, boolean swingLowBroken,
+                           boolean forgeLongNow, boolean forgeShortNow,
+                           boolean htfLongNow, boolean htfShortNow,
+                           boolean usesStructure, boolean usesForge) {
+    if (longSignal && !shortSignal) return "LONG SIGNAL";
+    if (shortSignal && !longSignal) return "SHORT SIGNAL";
+
+    boolean liveBullBreak = usesStructure && !Double.isNaN(lastSwingHigh) && !swingHighBroken && breakHighSrc > lastSwingHigh && htfLongNow;
+    boolean liveBearBreak = usesStructure && !Double.isNaN(lastSwingLow) && !swingLowBroken && breakLowSrc < lastSwingLow && htfShortNow;
+    boolean longFilterOk = !usesForge || forgeLongNow;
+    boolean shortFilterOk = !usesForge || forgeShortNow;
+    if (liveBullBreak && !liveBearBreak) return longFilterOk ? "LIVE LONG" : "LONG BREAK";
+    if (liveBearBreak && !liveBullBreak) return shortFilterOk ? "LIVE SHORT" : "SHORT BREAK";
+
+    if (projection != null) {
+      if (projection.longValid && !projection.shortValid) {
+        String compact = compactProjectionLabel(projection.longLabel, true);
+        if (!compact.startsWith("WAIT")) return compact;
+      }
+      if (projection.shortValid && !projection.longValid) {
+        String compact = compactProjectionLabel(projection.shortLabel, false);
+        if (!compact.startsWith("WAIT")) return compact;
+      }
+
+      boolean longReady = projectionReady(projection.longLabel);
+      boolean shortReady = projectionReady(projection.shortLabel);
+      if (longReady && !shortReady) return "NEXT LONG";
+      if (shortReady && !longReady) return "NEXT SHORT";
+      if (longReady && shortReady) return "DUAL SETUP";
+    }
+
+    if (usesStructure && structTrend > 0 && htfLongNow && longFilterOk) return "LONG BIAS";
+    if (usesStructure && structTrend < 0 && htfShortNow && shortFilterOk) return "SHORT BIAS";
+    if (!usesStructure && usesForge && forgeLongNow && !forgeShortNow && htfLongNow) return "FORGE LONG";
+    if (!usesStructure && usesForge && forgeShortNow && !forgeLongNow && htfShortNow) return "FORGE SHORT";
+    if (usesStructure && structTrend > 0) return "BULL STRUCT";
+    if (usesStructure && structTrend < 0) return "BEAR STRUCT";
+
+    if (projection != null) {
+      if (projection.longValid && !projection.shortValid) return compactProjectionLabel(projection.longLabel, true);
+      if (projection.shortValid && !projection.longValid) return compactProjectionLabel(projection.shortLabel, false);
+      if (projection.longValid && projection.shortValid) return "RANGE WAIT";
+    }
+    return "NEUTRAL";
+  }
+
+  static java.awt.Color stateColor(String state, SettingsView cfg) {
+    if (state == null) return cfg.neutralColor;
+    if (state.contains("LONG")) return cfg.bullColor;
+    if (state.contains("SHORT")) return cfg.bearColor;
+    if ("DUAL SETUP".equals(state) || "RANGE WAIT".equals(state)) return DashboardFigure.ACCENT;
+    return cfg.neutralColor;
+  }
+
   static String coreFilterSnapshot(SettingsView cfg, int i, double close, double[] rsi, Stoch stoch, Sar sar) {
     StringBuilder b = new StringBuilder(96);
     if (cfg.enableRsi && rsi != null && i < rsi.length) {
@@ -149,5 +206,15 @@ final class DashboardSupport {
 
   private static String side(boolean longOk, boolean shortOk) {
     return longOk ? " L" : shortOk ? " S" : " -";
+  }
+
+  private static String compactProjectionLabel(String label, boolean isLong) {
+    if (label == null || label.isEmpty()) return isLong ? "NEXT LONG" : "NEXT SHORT";
+    if (label.startsWith("WAIT")) return isLong ? "WAIT LONG" : "WAIT SHORT";
+    return isLong ? "NEXT LONG" : "NEXT SHORT";
+  }
+
+  private static boolean projectionReady(String label) {
+    return label != null && !label.startsWith("WAIT");
   }
 }

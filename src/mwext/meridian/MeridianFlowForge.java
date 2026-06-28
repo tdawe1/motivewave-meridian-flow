@@ -1111,63 +1111,43 @@ public class MeridianFlowForge extends Study
                              boolean swingHighBroken, boolean swingLowBroken,
                              boolean[] forgeLong, boolean[] forgeShort, HtfBias htfBias,
                              double[] atrRisk, double[] rsi, Stoch stoch, Sar sar, Tilson tilson, Smi smi) {
-    if (signalIndex < 0 || signalIndex >= s.size()) return;
-    int closedIndex = Math.max(0, Math.min(signalIndex, s.size() - 1));
-    int stateIndex = Math.max(0, Math.min(marketIndex, s.size() - 1));
-    BacktestStats stats = MeridianBacktest.runBacktest(s, cfg, closedIndex, longSignals, shortSignals, atrRisk, cfg.dashboardLookback);
-    OptimizerResult opt = cfg.showOptimizer ? optimizer.currentResult(s, cfg) : null;
-    int bars = Math.min(cfg.dashboardLookback, closedIndex + 1);
-    boolean longSignalNow = stateIndex == closedIndex && longSignals[closedIndex];
-    boolean shortSignalNow = stateIndex == closedIndex && shortSignals[closedIndex];
-    boolean forgeLongNow = forgeLong != null && stateIndex < forgeLong.length && forgeLong[stateIndex];
-    boolean forgeShortNow = forgeShort != null && stateIndex < forgeShort.length && forgeShort[stateIndex];
-    boolean htfLongNow = !cfg.useHtf || (htfBias != null && stateIndex < htfBias.bull.length && htfBias.bull[stateIndex]);
-    boolean htfShortNow = !cfg.useHtf || (htfBias != null && stateIndex < htfBias.bear.length && htfBias.bear[stateIndex]);
-    double breakHighSrc = cfg.breakOnWick ? s.getHigh(stateIndex) : s.getClose(stateIndex);
-    double breakLowSrc = cfg.breakOnWick ? s.getLow(stateIndex) : s.getClose(stateIndex);
-    SignalSourceOption signalSource = SignalSourceOption.from(cfg.signalSource);
-    String signal = dashboardStateLabel(longSignalNow, shortSignalNow, projection, structTrend,
-      breakHighSrc, breakLowSrc, lastSwingHigh, lastSwingLow, swingHighBroken, swingLowBroken,
-      forgeLongNow, forgeShortNow, htfLongNow, htfShortNow,
-      signalSource.usesStructure(), signalSource.usesForge());
-    Color signalColor = dashboardStateColor(signal, cfg);
-    double winRate = stats.trades == 0 ? 0.0 : 100.0 * stats.wins / stats.trades;
-    double profitFactor = MeridianBacktest.profitFactor(stats);
-    double netProfitFactor = MeridianBacktest.netProfitFactor(stats);
-    double recoveryFactor = MeridianBacktest.recoveryFactor(stats);
-    boolean recommendationAvailable = opt != null && opt.valid && opt.cfg != null && !sameTuning(cfg, opt.cfg);
-    boolean manualOptimizerWaiting = cfg.showOptimizer && ("READY".equals(optimizer.statusValue()) || "STALE".equals(optimizer.statusValue()));
-    boolean showOptimizerApply = recommendationAvailable || manualOptimizerWaiting;
+    DashboardContext dashboard = DashboardContext.create(s, cfg, signalIndex, marketIndex, longSignals, shortSignals,
+      projection, structTrend, lastSwingHigh, lastSwingLow, swingHighBroken, swingLowBroken,
+      forgeLong, forgeShort, htfBias, atrRisk, rsi, stoch, sar, tilson, smi, optimizer);
+    if (dashboard == null) return;
+
+    BacktestStats stats = dashboard.stats;
+    OptimizerResult opt = dashboard.optimizerResult;
     DashboardRow[] rows = new DashboardRow[40];
     int row = 0;
     if (cfg.dashboardCompact) {
-      rows[row++] = headerRow("MF", VERSION, signal, signalColor);
+      rows[row++] = headerRow("MF", VERSION, dashboard.signal, dashboard.signalColor);
       rows[row++] = dashRow("Cfg", enabledCount(cfg) + "F " + (cfg.requireAll ? "ALL" : "ANY"), cfg.singleTarget ? "1TP" : "3TP", DashboardFigure.TEXT);
-      rows[row++] = dashRow("Run", optimizer.statusValue(), optimizer.statusExtra(), optimizerStatusColor(optimizer.statusKind()));
-      rows[row++] = dashRow("BT", stats.trades + "t " + formatPct(winRate), "PF " + formatRatio(profitFactor), ratioColor(profitFactor, 1.0));
+      rows[row++] = dashRow("Run", dashboard.optimizerStatusValue, dashboard.optimizerStatusExtra, optimizerStatusColor(dashboard.optimizerStatusKind));
+      rows[row++] = dashRow("BT", stats.trades + "t " + formatPct(dashboard.winRate), "PF " + formatRatio(dashboard.profitFactor), ratioColor(dashboard.profitFactor, 1.0));
       rows[row++] = dashRow("Net", formatSigned(stats.netPoints), "DD " + formatPoints(stats.maxDrawdownPoints), signedColor(stats.netPoints));
       rows[row++] = dashRow("Tgt", targetStats(stats, cfg), "SL " + stats.stops, stats.stops <= stats.wins ? DashboardFigure.GOOD : DashboardFigure.WARN);
       if (opt != null && opt.stats != null) {
-        rows[row++] = dashRow("Rec", recommendationAvailable ? "APPLY" : "OK", parameterSummaryRisk(opt.cfg), recommendationAvailable ? DashboardFigure.WARN : DashboardFigure.GOOD);
+        rows[row++] = dashRow("Rec", dashboard.recommendationAvailable ? "APPLY" : "OK", parameterSummaryRisk(opt.cfg), dashboard.recommendationAvailable ? DashboardFigure.WARN : DashboardFigure.GOOD);
         rows[row++] = dashRow("Opt", formatSigned(opt.stats.netPoints), "PF " + formatRatio(MeridianBacktest.profitFactor(opt.stats)) + " DD " + formatPoints(opt.stats.maxDrawdownPoints), signedColor(opt.stats.netPoints));
       }
     }
     else {
-      rows[row++] = headerRow("Meridian Forge", VERSION, signal, signalColor);
-      rows[row++] = dashRow("Setup", cfg.signalSource + " • " + cfg.signalMode, enabledCount(cfg) + " filters • " + (cfg.requireAll ? "ALL" : "ANY"), signalColor);
-      String coreFilters = coreFilterSnapshot(cfg, stateIndex, s.getClose(stateIndex), rsi, stoch, sar);
-      String strategyFilters = strategyFilterSnapshot(cfg, stateIndex, tilson, smi);
+      rows[row++] = headerRow("Meridian Forge", VERSION, dashboard.signal, dashboard.signalColor);
+      rows[row++] = dashRow("Setup", cfg.signalSource + " • " + cfg.signalMode, enabledCount(cfg) + " filters • " + (cfg.requireAll ? "ALL" : "ANY"), dashboard.signalColor);
+      String coreFilters = dashboard.coreFilters;
+      String strategyFilters = dashboard.strategyFilters;
       if (!"none".equals(coreFilters) || !"none".equals(strategyFilters)) {
         String filters = "none".equals(coreFilters) ? strategyFilters : "none".equals(strategyFilters) ? coreFilters : coreFilters + " | " + strategyFilters;
         rows[row++] = dashRow("Filters", filters, "", DashboardFigure.TEXT);
       }
       rows[row++] = dashRow("Risk", cfg.singleTarget ? "Single TP" : "Three TP", parameterSummaryRisk(cfg), DashboardFigure.TEXT);
-      rows[row++] = dashRow("Backtest", stats.trades + " trades • " + formatPct(winRate) + " WR", bars + " bars • PF " + formatRatio(profitFactor) + " • NPF " + formatRatio(netProfitFactor), ratioColor(profitFactor, 1.0));
-      rows[row++] = dashRow("Net/DD", formatSigned(stats.netPoints), "DD " + formatPoints(stats.maxDrawdownPoints) + " • RF " + formatRatio(recoveryFactor), signedColor(stats.netPoints));
+      rows[row++] = dashRow("Backtest", stats.trades + " trades • " + formatPct(dashboard.winRate) + " WR", dashboard.bars + " bars • PF " + formatRatio(dashboard.profitFactor) + " • NPF " + formatRatio(dashboard.netProfitFactor), ratioColor(dashboard.profitFactor, 1.0));
+      rows[row++] = dashRow("Net/DD", formatSigned(stats.netPoints), "DD " + formatPoints(stats.maxDrawdownPoints) + " • RF " + formatRatio(dashboard.recoveryFactor), signedColor(stats.netPoints));
       rows[row++] = dashRow("Targets", targetStats(stats, cfg), "SL " + stats.stops, stats.stops <= stats.wins ? DashboardFigure.GOOD : DashboardFigure.WARN);
-      rows[row++] = dashRow("Optimizer", optimizer.statusValue(), optimizer.statusExtra(), optimizerStatusColor(optimizer.statusKind()));
+      rows[row++] = dashRow("Optimizer", dashboard.optimizerStatusValue, dashboard.optimizerStatusExtra, optimizerStatusColor(dashboard.optimizerStatusKind));
       if (opt != null && opt.stats != null) {
-        rows[row++] = headerRow("Recommendation", recommendationAvailable ? (cfg.autoApplyOptimizer ? "auto pending" : "ready") : "current", opt.objective + " · " + depthLabel(cfg.optimizerDepth) + " · " + opt.candidates + " tries", recommendationAvailable ? DashboardFigure.WARN : DashboardFigure.GOOD);
+        rows[row++] = headerRow("Recommendation", dashboard.recommendationAvailable ? (cfg.autoApplyOptimizer ? "auto pending" : "ready") : "current", opt.objective + " · " + depthLabel(cfg.optimizerDepth) + " · " + opt.candidates + " tries", dashboard.recommendationAvailable ? DashboardFigure.WARN : DashboardFigure.GOOD);
         rows[row++] = dashRow("Rec risk", parameterSummaryRisk(opt.cfg), opt.note == null ? "" : opt.note, DashboardFigure.ACCENT);
         String filters = parameterSummaryFilters(opt.cfg, true);
         if (!filters.isEmpty()) rows[row++] = dashRow("Rec filters", filters, "", DashboardFigure.ACCENT);
@@ -1178,73 +1158,9 @@ public class MeridianFlowForge extends Study
       rows[row++] = dashRow(cfg.dashboardCompact ? "Model" : "Model open", stats.activeDir > 0 ? "LONG " + formatPrice(stats.activeEntry) : "SHORT " + formatPrice(stats.activeEntry),
         "UPL " + formatSigned(stats.activeUnrealized), signedColor(stats.activeUnrealized));
     }
-    lastDashboardFigure = new DashboardFigure(rows, row, cfg.dashboardCompact, cfg.dashboardPosPreset, cfg.dashboardXOffset, cfg.dashboardYOffset, cfg.dashboardScale / 100.0, showOptimizerApply);
+    lastDashboardFigure = new DashboardFigure(rows, row, cfg.dashboardCompact, cfg.dashboardPosPreset, cfg.dashboardXOffset, cfg.dashboardYOffset, cfg.dashboardScale / 100.0, dashboard.showOptimizerApply);
     addFigure(lastDashboardFigure);
   }
-
-  static String dashboardStateLabel(boolean longSignal, boolean shortSignal, Projection projection,
-                                    int structTrend, double breakHighSrc, double breakLowSrc,
-                                    double lastSwingHigh, double lastSwingLow,
-                                    boolean swingHighBroken, boolean swingLowBroken,
-                                    boolean forgeLongNow, boolean forgeShortNow,
-                                    boolean htfLongNow, boolean htfShortNow,
-                                    boolean usesStructure, boolean usesForge) {
-    if (longSignal && !shortSignal) return "LONG SIGNAL";
-    if (shortSignal && !longSignal) return "SHORT SIGNAL";
-
-    boolean liveBullBreak = usesStructure && !Double.isNaN(lastSwingHigh) && !swingHighBroken && breakHighSrc > lastSwingHigh && htfLongNow;
-    boolean liveBearBreak = usesStructure && !Double.isNaN(lastSwingLow) && !swingLowBroken && breakLowSrc < lastSwingLow && htfShortNow;
-    boolean longFilterOk = !usesForge || forgeLongNow;
-    boolean shortFilterOk = !usesForge || forgeShortNow;
-    if (liveBullBreak && !liveBearBreak) return longFilterOk ? "LIVE LONG" : "LONG BREAK";
-    if (liveBearBreak && !liveBullBreak) return shortFilterOk ? "LIVE SHORT" : "SHORT BREAK";
-
-    if (projection != null) {
-      if (projection.longValid && !projection.shortValid) {
-        String compact = compactProjectionLabel(projection.longLabel, true);
-        if (!compact.startsWith("WAIT")) return compact;
-      }
-      if (projection.shortValid && !projection.longValid) {
-        String compact = compactProjectionLabel(projection.shortLabel, false);
-        if (!compact.startsWith("WAIT")) return compact;
-      }
-
-      boolean longReady = projectionReady(projection.longLabel);
-      boolean shortReady = projectionReady(projection.shortLabel);
-      if (longReady && !shortReady) return "NEXT LONG";
-      if (shortReady && !longReady) return "NEXT SHORT";
-      if (longReady && shortReady) return "DUAL SETUP";
-    }
-
-    if (usesStructure && structTrend > 0 && htfLongNow && longFilterOk) return "LONG BIAS";
-    if (usesStructure && structTrend < 0 && htfShortNow && shortFilterOk) return "SHORT BIAS";
-    if (!usesStructure && usesForge && forgeLongNow && !forgeShortNow && htfLongNow) return "FORGE LONG";
-    if (!usesStructure && usesForge && forgeShortNow && !forgeLongNow && htfShortNow) return "FORGE SHORT";
-    if (usesStructure && structTrend > 0) return "BULL STRUCT";
-    if (usesStructure && structTrend < 0) return "BEAR STRUCT";
-
-    if (projection != null) {
-      if (projection.longValid && !projection.shortValid) return compactProjectionLabel(projection.longLabel, true);
-      if (projection.shortValid && !projection.longValid) return compactProjectionLabel(projection.shortLabel, false);
-      if (projection.longValid && projection.shortValid) return "RANGE WAIT";
-    }
-    return "NEUTRAL";
-  }
-
-  private static String compactProjectionLabel(String label, boolean isLong) {
-    if (label == null || label.isEmpty()) return isLong ? "NEXT LONG" : "NEXT SHORT";
-    if (label.startsWith("WAIT")) return isLong ? "WAIT LONG" : "WAIT SHORT";
-    return isLong ? "NEXT LONG" : "NEXT SHORT";
-  }
-
-  private static Color dashboardStateColor(String state, SettingsView cfg) {
-    if (state == null) return cfg.neutralColor;
-    if (state.contains("LONG")) return cfg.bullColor;
-    if (state.contains("SHORT")) return cfg.bearColor;
-    if ("DUAL SETUP".equals(state) || "RANGE WAIT".equals(state)) return DashboardFigure.ACCENT;
-    return cfg.neutralColor;
-  }
-
 
   private static Color optimizerStatusColor(int kind) {
     return switch (kind) {

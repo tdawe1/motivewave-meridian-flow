@@ -24,7 +24,7 @@ public final class DashboardStateTest {
                               boolean swingHighBroken, boolean swingLowBroken,
                               boolean forgeLongNow, boolean forgeShortNow, boolean htfLongNow, boolean htfShortNow,
                               boolean usesStructure, boolean usesForge) {
-    return MeridianFlowForge.dashboardStateLabel(longSignal, shortSignal, projection, structTrend,
+    return DashboardSupport.stateLabel(longSignal, shortSignal, projection, structTrend,
       breakHighSrc, breakLowSrc, lastSwingHigh, lastSwingLow, swingHighBroken, swingLowBroken,
       forgeLongNow, forgeShortNow, htfLongNow, htfShortNow, usesStructure, usesForge);
   }
