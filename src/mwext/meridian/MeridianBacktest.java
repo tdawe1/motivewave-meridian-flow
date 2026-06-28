@@ -24,20 +24,10 @@ final class MeridianBacktest {
         double adverse = activeDir == 1 ? s.getLow(i) : s.getHigh(i);
         updateDrawdown(stats, stats.netPoints + activeDir * (adverse - entry));
         boolean slHit = activeDir == 1 ? s.getLow(i) <= sl : s.getHigh(i) >= sl;
-        boolean tp1Hit = !Double.isNaN(tp1) && (activeDir == 1 ? s.getHigh(i) >= tp1 : s.getLow(i) <= tp1);
-        boolean tp2Hit = !Double.isNaN(tp2) && (activeDir == 1 ? s.getHigh(i) >= tp2 : s.getLow(i) <= tp2);
-        boolean tp3Hit = !Double.isNaN(tp3) && (activeDir == 1 ? s.getHigh(i) >= tp3 : s.getLow(i) <= tp3);
-        boolean tp1First = targetHitBeforeStop(slHit, tp1Hit) && !tp1Reached;
-        boolean tp2First = targetHitBeforeStop(slHit, tp2Hit) && !tp2Reached;
-        boolean finalTargetFirst = targetHitBeforeStop(slHit, cfg.singleTarget ? tp1Hit : tp3Hit);
-        if (slHit) {
-          boolean beStop = Math.abs(sl - entry) < 0.0000001;
-          closeBacktestTrade(stats, activeDir, entry, sl);
-          if (!beStop) stats.stops++;
-          activeDir = 0;
-          entryIndex = -1;
-          continue;
-        }
+        boolean tp1First = targetHitBeforeStop(activeDir, s.getOpen(i), s.getHigh(i), s.getLow(i), s.getClose(i), sl, tp1) && !tp1Reached;
+        boolean tp2First = targetHitBeforeStop(activeDir, s.getOpen(i), s.getHigh(i), s.getLow(i), s.getClose(i), sl, tp2) && !tp2Reached;
+        boolean finalTargetFirst = cfg.singleTarget ? tp1First
+          : targetHitBeforeStop(activeDir, s.getOpen(i), s.getHigh(i), s.getLow(i), s.getClose(i), sl, tp3);
         if (tp1First) {
           stats.tp1Hits++;
           tp1Reached = true;
@@ -50,6 +40,14 @@ final class MeridianBacktest {
         if (finalTargetFirst) {
           if (!cfg.singleTarget) stats.tp3Hits++;
           closeBacktestTrade(stats, activeDir, entry, cfg.singleTarget ? tp1 : tp3);
+          activeDir = 0;
+          entryIndex = -1;
+          continue;
+        }
+        if (slHit) {
+          boolean beStop = Math.abs(sl - entry) < 0.0000001;
+          closeBacktestTrade(stats, activeDir, entry, sl);
+          if (!beStop) stats.stops++;
           activeDir = 0;
           entryIndex = -1;
           continue;
@@ -150,8 +148,52 @@ final class MeridianBacktest {
     return Math.max(200, Math.max(cfg.swingLen * 6, indicatorWarmup * 3));
   }
 
-  static boolean targetHitBeforeStop(boolean slHit, boolean targetHit) {
-    return targetHit && !slHit;
+  static boolean targetHitBeforeStop(int dir, double open, double high, double low, double close, double stop, double target) {
+    if (dir == 0 || !finite(stop) || !finite(target)) return false;
+    boolean targetHit = dir > 0 ? high >= target : low <= target;
+    if (!targetHit) return false;
+    boolean stopHit = dir > 0 ? low <= stop : high >= stop;
+    if (!stopHit) return true;
+    return firstHitOnOhlcPath(dir, open, high, low, close, stop, target) == 1;
+  }
+
+  private static int firstHitOnOhlcPath(int dir, double open, double high, double low, double close, double stop, double target) {
+    boolean targetAtOpen = dir > 0 ? open >= target : open <= target;
+    boolean stopAtOpen = dir > 0 ? open <= stop : open >= stop;
+    if (targetAtOpen && stopAtOpen) return -1;
+    if (targetAtOpen) return 1;
+    if (stopAtOpen) return -1;
+
+    // Without tick data, approximate the intrabar path by sending the first wick opposite the candle body.
+    double[] path = close >= open
+      ? new double[] { open, low, high, close }
+      : new double[] { open, high, low, close };
+    for (int i = 1; i < path.length; i++) {
+      int hit = firstHitOnSegment(path[i - 1], path[i], stop, target);
+      if (hit != 0) return hit;
+    }
+    return -1;
+  }
+
+  private static int firstHitOnSegment(double from, double to, double stop, double target) {
+    boolean stopHit = crosses(from, to, stop);
+    boolean targetHit = crosses(from, to, target);
+    if (targetHit && stopHit) {
+      double targetDistance = Math.abs(target - from);
+      double stopDistance = Math.abs(stop - from);
+      return targetDistance < stopDistance ? 1 : -1;
+    }
+    if (targetHit) return 1;
+    if (stopHit) return -1;
+    return 0;
+  }
+
+  private static boolean crosses(double from, double to, double level) {
+    return (from <= level && level <= to) || (to <= level && level <= from);
+  }
+
+  private static boolean finite(double value) {
+    return !Double.isNaN(value) && !Double.isInfinite(value);
   }
 
   private static double nz(double v) {

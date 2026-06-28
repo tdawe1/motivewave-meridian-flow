@@ -769,13 +769,13 @@ public class MeridianFlowForge extends Study
 
       boolean canCheckHit = activeDir != 0 && entryBar >= 0 && i > entryBar && confirmed;
       boolean slHit = canCheckHit && (activeDir == 1 ? s.getLow(i) <= activeSL : s.getHigh(i) >= activeSL);
-      boolean tp1Hit = canCheckHit && !Double.isNaN(activeTP1) && (activeDir == 1 ? s.getHigh(i) >= activeTP1 : s.getLow(i) <= activeTP1);
-      boolean tp2Hit = canCheckHit && !Double.isNaN(activeTP2) && (activeDir == 1 ? s.getHigh(i) >= activeTP2 : s.getLow(i) <= activeTP2);
-      boolean tp3Hit = canCheckHit && !Double.isNaN(activeTP3) && (activeDir == 1 ? s.getHigh(i) >= activeTP3 : s.getLow(i) <= activeTP3);
 
-      boolean tp1First = targetHitBeforeStop(slHit, tp1Hit) && !tp1Reached;
-      boolean tp2First = targetHitBeforeStop(slHit, tp2Hit) && !tp2Reached;
-      boolean tp3First = targetHitBeforeStop(slHit, tp3Hit) && !tp3Reached;
+      boolean tp1First = canCheckHit && MeridianBacktest.targetHitBeforeStop(activeDir, s.getOpen(i), s.getHigh(i),
+        s.getLow(i), s.getClose(i), activeSL, activeTP1) && !tp1Reached;
+      boolean tp2First = canCheckHit && MeridianBacktest.targetHitBeforeStop(activeDir, s.getOpen(i), s.getHigh(i),
+        s.getLow(i), s.getClose(i), activeSL, activeTP2) && !tp2Reached;
+      boolean tp3First = canCheckHit && MeridianBacktest.targetHitBeforeStop(activeDir, s.getOpen(i), s.getHigh(i),
+        s.getLow(i), s.getClose(i), activeSL, activeTP3) && !tp3Reached;
       if (tp1First) tp1Reached = true;
       if (tp2First) tp2Reached = true;
       if (tp3First) tp3Reached = true;
@@ -803,8 +803,10 @@ public class MeridianFlowForge extends Study
         lastTrade.beActive = beActive;
       }
 
-      if ((slHit || (cfg.singleTarget ? tp1Hit : tp3Hit)) && activeDir != 0) {
-        if (i == signalIndex && slHit && cfg.alertSl) {
+      boolean finalTargetFirst = cfg.singleTarget ? tp1First : tp3First;
+      boolean stopClosesTrade = slHit && !finalTargetFirst;
+      if ((stopClosesTrade || finalTargetFirst) && activeDir != 0) {
+        if (i == signalIndex && stopClosesTrade && cfg.alertSl) {
           signal(ctx, i, Signals.SL_HIT, (beActive ? "BE stop-out " : "SL hit ") + formatPrice(activeSL), activeSL);
         }
         activeDir = 0;
@@ -1456,70 +1458,6 @@ public class MeridianFlowForge extends Study
         }
       }
     }
-  }
-
-  private static ForgeState forgeState(SettingsView c, int i, double[] smaFast, double[] smaSlow, double[] emaFast,
-                                       double[] emaSlow, double[] rsi, Macd macd, Stoch stoch, Bands bb,
-                                       double[] closes, double[] ao, Sar sar, double[] cci, Adx adx, Super st,
-                                       Tilson tilson, Smi smi) {
-    boolean longCond = c.requireAll;
-    boolean shortCond = c.requireAll;
-    boolean any = false;
-    if (c.enableSma) { any = true; longCond = merge(c.requireAll, longCond, smaFast[i] > smaSlow[i]); shortCond = merge(c.requireAll, shortCond, smaFast[i] < smaSlow[i]); }
-    if (c.enableRsi) { any = true; longCond = merge(c.requireAll, longCond, rsi[i] > c.rsiLong); shortCond = merge(c.requireAll, shortCond, rsi[i] < c.rsiShort); }
-    if (c.enableMacd) { any = true; longCond = merge(c.requireAll, longCond, macd.line[i] > macd.signal[i]); shortCond = merge(c.requireAll, shortCond, macd.line[i] < macd.signal[i]); }
-    if (c.enableSt) { any = true; longCond = merge(c.requireAll, longCond, st.dir[i] == -1); shortCond = merge(c.requireAll, shortCond, st.dir[i] == 1); }
-    if (c.enableStoch) {
-      any = true;
-      boolean stochLong = !Double.isNaN(stoch.k[i]) && !Double.isNaN(stoch.d[i]) && stoch.k[i] > stoch.d[i] && stoch.k[i] > 50;
-      boolean stochShort = !Double.isNaN(stoch.k[i]) && !Double.isNaN(stoch.d[i]) && stoch.k[i] < stoch.d[i] && stoch.k[i] < 50;
-      longCond = merge(c.requireAll, longCond, stochLong);
-      shortCond = merge(c.requireAll, shortCond, stochShort);
-    }
-    if (c.enableBb) {
-      any = true;
-      boolean bbLong = bb != null && !Double.isNaN(bb.upper[i]) && closes[i] > bb.upper[i];
-      boolean bbShort = bb != null && !Double.isNaN(bb.lower[i]) && closes[i] < bb.lower[i];
-      longCond = merge(c.requireAll, longCond, bbLong);
-      shortCond = merge(c.requireAll, shortCond, bbShort);
-    }
-    if (c.enableEma) { any = true; longCond = merge(c.requireAll, longCond, emaFast[i] > emaSlow[i]); shortCond = merge(c.requireAll, shortCond, emaFast[i] < emaSlow[i]); }
-    if (c.enableAo) { any = true; longCond = merge(c.requireAll, longCond, ao[i] > 0); shortCond = merge(c.requireAll, shortCond, ao[i] < 0); }
-    if (c.enableSar) { any = true; longCond = merge(c.requireAll, longCond, closes[i] > sar.value[i]); shortCond = merge(c.requireAll, shortCond, closes[i] < sar.value[i]); }
-    if (c.enableCci) { any = true; longCond = merge(c.requireAll, longCond, cci[i] > c.cciLong); shortCond = merge(c.requireAll, shortCond, cci[i] < c.cciShort); }
-    if (c.enableAdx) { any = true; longCond = merge(c.requireAll, longCond, adx.adx[i] > c.adxThreshold && adx.plus[i] > adx.minus[i]); shortCond = merge(c.requireAll, shortCond, adx.adx[i] > c.adxThreshold && adx.minus[i] > adx.plus[i]); }
-    if (c.enableTilson) {
-      any = true;
-      boolean tilsonLong = tilson != null && !Double.isNaN(tilson.value[i]) && !Double.isNaN(tilson.price[i]) && tilson.value[i] > tilson.price[i];
-      boolean tilsonShort = tilson != null && !Double.isNaN(tilson.value[i]) && !Double.isNaN(tilson.price[i]) && tilson.value[i] < tilson.price[i];
-      longCond = merge(c.requireAll, longCond, tilsonLong);
-      shortCond = merge(c.requireAll, shortCond, tilsonShort);
-    }
-    if (c.enableSmi) {
-      any = true;
-      boolean smiReady = smi != null && !Double.isNaN(smi.value[i]) && !Double.isNaN(smi.signal[i]);
-      boolean smiLong = smiReady && smi.value[i] > smi.signal[i];
-      boolean smiShort = smiReady && smi.value[i] < smi.signal[i];
-      if ("Zero Bias".equals(c.smiMode)) {
-        smiLong = smiLong && smi.value[i] > 0.0;
-        smiShort = smiShort && smi.value[i] < 0.0;
-      }
-      else if ("Guided Reversal".equals(c.smiMode)) {
-        smiLong = smiReady && smi.crossAbove[i] && smi.value[i] < c.smiBottomGuide;
-        smiShort = smiReady && smi.crossBelow[i] && smi.value[i] > c.smiTopGuide;
-      }
-      longCond = merge(c.requireAll, longCond, smiLong);
-      shortCond = merge(c.requireAll, shortCond, smiShort);
-    }
-    return any ? new ForgeState(longCond, shortCond) : new ForgeState(false, false);
-  }
-
-  private static boolean targetHitBeforeStop(boolean slHit, boolean targetHit) {
-    return targetHit && !slHit;
-  }
-
-  private static boolean merge(boolean requireAll, boolean current, boolean next) {
-    return requireAll ? current && next : current || next;
   }
 
   private HtfBias buildHtfBias(SettingsView cfg, DataContext ctx, DataSeries base, int n) {
