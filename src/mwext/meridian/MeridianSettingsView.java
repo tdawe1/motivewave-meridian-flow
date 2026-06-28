@@ -163,7 +163,6 @@ final class SettingsView {
     projectionBars = st.getInteger(MeridianFlowForge.PROJECTION_BARS, 16);
     showSignalImage = st.getBoolean(MeridianFlowForge.SHOW_SIGNAL_IMAGE, true);
     signalImageFile = st.getFile(MeridianFlowForge.SIGNAL_IMAGE_FILE);
-    if (signalImageFile == null) signalImageFile = new File(MeridianFlowForge.DEFAULT_SIGNAL_IMAGE);
     signalImageSize = st.getInteger(MeridianFlowForge.SIGNAL_IMAGE_SIZE, 72);
     signalImageOffset = st.getInteger(MeridianFlowForge.SIGNAL_IMAGE_OFFSET, 8);
     showOptimizer = st.getBoolean(MeridianFlowForge.SHOW_OPTIMIZER, false);

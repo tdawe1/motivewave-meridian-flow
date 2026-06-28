@@ -45,6 +45,21 @@ public final class TradePathTest {
     // Neither target nor stop hit
     assertFalse(MeridianBacktest.targetHitBeforeStop(1, 100, 102, 98, 101, 95, 105),
       "neither hit on bar");
+
+    boolean[] longs = new boolean[4];
+    boolean[] shorts = new boolean[4];
+    MeridianIndicators.storeNonConflictingSignals(longs, shorts, 0, true, false);
+    MeridianIndicators.storeNonConflictingSignals(longs, shorts, 1, false, true);
+    MeridianIndicators.storeNonConflictingSignals(longs, shorts, 2, true, true);
+    MeridianIndicators.storeNonConflictingSignals(longs, shorts, 3, false, false);
+    assertTrue(longs[0], "long-only signal kept");
+    assertFalse(shorts[0], "long-only short side clear");
+    assertFalse(longs[1], "short-only long side clear");
+    assertTrue(shorts[1], "short-only signal kept");
+    assertFalse(longs[2], "conflicting long signal suppressed");
+    assertFalse(shorts[2], "conflicting short signal suppressed");
+    assertFalse(longs[3], "empty long remains clear");
+    assertFalse(shorts[3], "empty short remains clear");
   }
 
   private static void assertTrue(boolean value, String label) {

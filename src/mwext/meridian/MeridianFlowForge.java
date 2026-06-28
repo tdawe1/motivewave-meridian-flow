@@ -200,7 +200,6 @@ public class MeridianFlowForge extends Study
   static final String SIGNAL_IMAGE_FILE = "signalImageFile";
   static final String SIGNAL_IMAGE_SIZE = "signalImageSize";
   static final String SIGNAL_IMAGE_OFFSET = "signalImageOffset";
-  static final String DEFAULT_SIGNAL_IMAGE = "/home/user/.codex/attachments/fadbea5b-5c46-49ee-8436-86d3fdfff846/image-1.png";
 
   static final String ATR_RISK_LEN = "atrRiskLen";
   static final String SL_MULT = "slMult";
@@ -412,7 +411,7 @@ public class MeridianFlowForge extends Study
     vg.addRow(new IntegerDescriptor(DASHBOARD_SCALE, "Dashboard Width Scale %", 100, 50, 200, 5));
     vg.addRow(new BooleanDescriptor(SHOW_PROJECTION, "Show Next Trade Projection", true),
       new IntegerDescriptor(PROJECTION_BARS, "Projection Bars", 16, 4, 80, 1));
-    FileDescriptor signalImage = new FileDescriptor(SIGNAL_IMAGE_FILE, "Signal Image", new File(DEFAULT_SIGNAL_IMAGE));
+    FileDescriptor signalImage = new FileDescriptor(SIGNAL_IMAGE_FILE, "Signal Image", null);
     signalImage.setFilterName("PNG images");
     signalImage.setExtensions(Arrays.asList("*.png", "png"));
     vg.addRow(new BooleanDescriptor(SHOW_SIGNAL_IMAGE, "Show Signal Image", true),
@@ -508,7 +507,7 @@ public class MeridianFlowForge extends Study
     SettingsView cfg = new SettingsView();
     cfg.read(getSettings(), ctx);
     int signalIndex = latestCompleteIndex(s);
-    int marketIndex = latestMarketIndex(s);
+    int marketIndex = Math.max(0, s.size() - 1);
     String optimizerStatusBefore = optimizer.statusValue() + "\u0000" + optimizer.statusExtra() + "\u0000" + optimizer.statusKind() + "\u0000" + optimizer.lastComputeBar();
     if (getSettings().getBoolean(APPLY_OPTIMIZER, false)) {
       OptimizerResult applied = optimizer.apply(ctx, s, cfg, signalIndex, getSettings());
@@ -682,14 +681,14 @@ public class MeridianFlowForge extends Study
       }
 
       if (i == signalIndex) {
-        if (isBullBos && eventAllowed(cfg.signalMode, true, false)) signal(ctx, i, Signals.BULL_BOS, "Bull BOS above " + formatPrice(brokenHighLvl), brokenHighLvl);
-        if (isBullChoch && eventAllowed(cfg.signalMode, false, true)) signal(ctx, i, Signals.BULL_CHOCH, "Bull CHoCH above " + formatPrice(brokenHighLvl), brokenHighLvl);
-        if (isBearBos && eventAllowed(cfg.signalMode, true, false)) signal(ctx, i, Signals.BEAR_BOS, "Bear BOS below " + formatPrice(brokenLowLvl), brokenLowLvl);
-        if (isBearChoch && eventAllowed(cfg.signalMode, false, true)) signal(ctx, i, Signals.BEAR_CHOCH, "Bear CHoCH below " + formatPrice(brokenLowLvl), brokenLowLvl);
+        if (isBullBos && SignalModeOption.eventAllowed(cfg.signalMode, true, false)) signal(ctx, i, Signals.BULL_BOS, "Bull BOS above " + formatPrice(brokenHighLvl), brokenHighLvl);
+        if (isBullChoch && SignalModeOption.eventAllowed(cfg.signalMode, false, true)) signal(ctx, i, Signals.BULL_CHOCH, "Bull CHoCH above " + formatPrice(brokenHighLvl), brokenHighLvl);
+        if (isBearBos && SignalModeOption.eventAllowed(cfg.signalMode, true, false)) signal(ctx, i, Signals.BEAR_BOS, "Bear BOS below " + formatPrice(brokenLowLvl), brokenLowLvl);
+        if (isBearChoch && SignalModeOption.eventAllowed(cfg.signalMode, false, true)) signal(ctx, i, Signals.BEAR_CHOCH, "Bear CHoCH below " + formatPrice(brokenLowLvl), brokenLowLvl);
       }
 
-      boolean bullObEvent = eventAllowed(cfg.obFrom, isBullBos, isBullChoch);
-      boolean bearObEvent = eventAllowed(cfg.obFrom, isBearBos, isBearChoch);
+      boolean bullObEvent = SignalModeOption.eventAllowed(cfg.obFrom, isBullBos, isBullChoch);
+      boolean bearObEvent = SignalModeOption.eventAllowed(cfg.obFrom, isBearBos, isBearChoch);
       if (cfg.showOB && bullObEvent) {
         int obBar = findObBar(s, i, true, cfg.obLookback);
         if (obBar >= 0) spawnOB(s, zones, 1, obBar, i, cfg);
@@ -701,8 +700,8 @@ public class MeridianFlowForge extends Study
 
       maintainOBs(ctx, s, zones, i, cfg, signalIndex);
 
-      boolean bullEvent = eventAllowed(cfg.signalMode, isBullBos, isBullChoch);
-      boolean bearEvent = eventAllowed(cfg.signalMode, isBearBos, isBearChoch);
+      boolean bullEvent = SignalModeOption.eventAllowed(cfg.signalMode, isBullBos, isBullChoch);
+      boolean bearEvent = SignalModeOption.eventAllowed(cfg.signalMode, isBearBos, isBearChoch);
       boolean htfBullOk = !cfg.useHtf || htfBias.bull[i];
       boolean htfBearOk = !cfg.useHtf || htfBias.bear[i];
       boolean forgeLongRising = forgeLong[i] && (i == 0 || !forgeLong[i - 1]);
@@ -721,15 +720,10 @@ public class MeridianFlowForge extends Study
         openLongSignal = openLongSignal || tradingBot.longSignal[i];
         openShortSignal = openShortSignal || tradingBot.shortSignal[i];
       }
-      openLongSignals[i] = openLongSignal;
-      openShortSignals[i] = openShortSignal;
-
       // Suppress conflicting long/short signals: store neither on a tie.
-      if (openLongSignal && openShortSignal) {
-        openLongSignal = openShortSignal = false;
-        openLongSignals[i] = false;
-        openShortSignals[i] = false;
-      }
+      storeNonConflictingSignals(openLongSignals, openShortSignals, i, openLongSignal, openShortSignal);
+      openLongSignal = openLongSignals[i];
+      openShortSignal = openShortSignals[i];
 
 
       double riskAtr = nz(atrRisk[i]);
@@ -975,9 +969,9 @@ public class MeridianFlowForge extends Study
     boolean forgeLongOk = !usesForge || forgeLongNow;
     boolean forgeShortOk = !usesForge || forgeShortNow;
     boolean structureLongOk = !usesStructure || (!Double.isNaN(lastSwingHigh) && !swingHighBroken &&
-      eventAllowed(cfg.signalMode, structTrend >= 0, structTrend < 0));
+      SignalModeOption.eventAllowed(cfg.signalMode, structTrend >= 0, structTrend < 0));
     boolean structureShortOk = !usesStructure || (!Double.isNaN(lastSwingLow) && !swingLowBroken &&
-      eventAllowed(cfg.signalMode, structTrend <= 0, structTrend > 0));
+      SignalModeOption.eventAllowed(cfg.signalMode, structTrend <= 0, structTrend > 0));
     double close = s.getClose(signalIndex);
 
     Projection p = new Projection();
@@ -1372,30 +1366,6 @@ public class MeridianFlowForge extends Study
     ctx.signal(index, sig, msg, value);
   }
 
-  private static boolean eventAllowed(String mode, boolean bos, boolean choch) {
-    return SignalModeOption.eventAllowed(mode, bos, choch);
-  }
-
-  private static boolean isPivotHigh(DataSeries s, int pivot, int len) {
-    double v = s.getHigh(pivot);
-    for (int i = pivot - len; i <= pivot + len; i++) {
-      if (i == pivot) continue;
-      if (i < 0 || i >= s.size()) return false;
-      if (s.getHigh(i) > v) return false;
-    }
-    return true;
-  }
-
-  private static boolean isPivotLow(DataSeries s, int pivot, int len) {
-    double v = s.getLow(pivot);
-    for (int i = pivot - len; i <= pivot + len; i++) {
-      if (i == pivot) continue;
-      if (i < 0 || i >= s.size()) return false;
-      if (s.getLow(i) < v) return false;
-    }
-    return true;
-  }
-
   private static int findObBar(DataSeries s, int bar, boolean wantBearish, int lookback) {
     int found = -1;
     int fallback = -1;
@@ -1529,10 +1499,6 @@ public class MeridianFlowForge extends Study
       if (s.isBarComplete(i)) return i;
     }
     return lastClosed;
-  }
-
-  private static int latestMarketIndex(DataSeries s) {
-    return Math.max(0, s.size() - 1);
   }
 
   private static long timeAtOrProjected(DataSeries s, int index) {

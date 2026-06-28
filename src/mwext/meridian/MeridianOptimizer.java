@@ -176,7 +176,6 @@ final class MeridianOptimizer {
       String depth = seed.optimizerDepth;
       int maxCand = maxCandidates(depth);
       int passes = optimizerPasses(seed);
-      boolean iterative = OptimizerDepthOption.DEEP.label.equals(depth);
 
       // Always evaluate the user's current settings as a baseline candidate.
       considerOptimizerCandidate(acc, ctx, s, seed, signalIndex, maxCand);
@@ -184,10 +183,7 @@ final class MeridianOptimizer {
       SettingsView anchor = seed.copy();
       for (int pass = 0; pass < passes && acc.candidates < maxCand; pass++) {
         scanAll(acc, ctx, s, anchor, signalIndex, maxCand);
-        if (iterative && acc.best != null) {
-          anchor = acc.best.cfg.copy();
-        }
-        else if (!iterative && acc.best != null) {
+        if (acc.best != null) {
           anchor = acc.best.cfg.copy();
         }
       }
@@ -496,8 +492,8 @@ final class MeridianOptimizer {
         swingLowBroken = true;
       }
 
-      boolean bullEvent = eventAllowed(cfg.signalMode, isBullBos, isBullChoch);
-      boolean bearEvent = eventAllowed(cfg.signalMode, isBearBos, isBearChoch);
+      boolean bullEvent = SignalModeOption.eventAllowed(cfg.signalMode, isBullBos, isBullChoch);
+      boolean bearEvent = SignalModeOption.eventAllowed(cfg.signalMode, isBearBos, isBearChoch);
       boolean htfBullOk = !cfg.useHtf || htfBias.bull[i];
       boolean htfBearOk = !cfg.useHtf || htfBias.bear[i];
       boolean forgeLong = false;
@@ -521,10 +517,7 @@ final class MeridianOptimizer {
         default -> bearEvent && htfBearOk && forgeShort;
       };
 
-      if (longs[i] && shorts[i]) {
-        longs[i] = false;
-        shorts[i] = false;
-      }
+      storeNonConflictingSignals(longs, shorts, i, longs[i], shorts[i]);
       prevForgeLong = forgeLong;
       prevForgeShort = forgeShort;
     }
@@ -656,30 +649,6 @@ final class MeridianOptimizer {
       if (!seen) tmp[count++] = value;
     }
     return Arrays.copyOf(tmp, count);
-  }
-
-  private static boolean eventAllowed(String mode, boolean bos, boolean choch) {
-    return SignalModeOption.eventAllowed(mode, bos, choch);
-  }
-
-  private static boolean isPivotHigh(DataSeries s, int pivot, int len) {
-    double v = s.getHigh(pivot);
-    for (int i = pivot - len; i <= pivot + len; i++) {
-      if (i == pivot) continue;
-      if (i < 0 || i >= s.size()) return false;
-      if (s.getHigh(i) > v) return false;
-    }
-    return true;
-  }
-
-  private static boolean isPivotLow(DataSeries s, int pivot, int len) {
-    double v = s.getLow(pivot);
-    for (int i = pivot - len; i <= pivot + len; i++) {
-      if (i == pivot) continue;
-      if (i < 0 || i >= s.size()) return false;
-      if (s.getLow(i) < v) return false;
-    }
-    return true;
   }
 
   private String cacheAgeText(SettingsView cfg, int signalIndex) {

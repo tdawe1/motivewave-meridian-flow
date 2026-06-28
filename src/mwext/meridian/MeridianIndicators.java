@@ -14,6 +14,32 @@ final class MeridianIndicators {
     return out;
   }
 
+  static boolean isPivotHigh(DataSeries s, int pivot, int len) {
+    double v = s.getHigh(pivot);
+    for (int i = pivot - len; i <= pivot + len; i++) {
+      if (i == pivot) continue;
+      if (i < 0 || i >= s.size()) return false;
+      if (s.getHigh(i) > v) return false;
+    }
+    return true;
+  }
+
+  static boolean isPivotLow(DataSeries s, int pivot, int len) {
+    double v = s.getLow(pivot);
+    for (int i = pivot - len; i <= pivot + len; i++) {
+      if (i == pivot) continue;
+      if (i < 0 || i >= s.size()) return false;
+      if (s.getLow(i) < v) return false;
+    }
+    return true;
+  }
+
+  static void storeNonConflictingSignals(boolean[] longs, boolean[] shorts, int index, boolean longSignal, boolean shortSignal) {
+    boolean conflict = longSignal && shortSignal;
+    longs[index] = longSignal && !conflict;
+    shorts[index] = shortSignal && !conflict;
+  }
+
   static double[] sourceArray(DataSeries s, String source) {
     double[] out = new double[s.size()];
     for (int i = 0; i < out.length; i++) {

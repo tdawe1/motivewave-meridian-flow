@@ -54,7 +54,7 @@ final class MeridianBacktest {
         }
       }
       if (activeDir == 0) {
-        double risk = nz(atrRisk[i]) * cfg.slMultEff;
+        double risk = MeridianIndicators.nz(atrRisk[i]) * cfg.slMultEff;
         if (risk <= 0) continue;
         boolean goLong = longSignals[i];
         boolean goShort = !goLong && shortSignals[i];
@@ -208,7 +208,4 @@ final class MeridianBacktest {
     return !Double.isNaN(value) && !Double.isInfinite(value);
   }
 
-  private static double nz(double v) {
-    return Double.isNaN(v) || Double.isInfinite(v) ? 0.0 : v;
-  }
 }

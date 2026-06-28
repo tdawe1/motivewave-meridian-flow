@@ -10,13 +10,19 @@ import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import javax.imageio.ImageIO;
 
 final class SignalImageFigure extends Figure {
-  private static final Map<String, BufferedImage> IMAGE_CACHE = new HashMap<>();
+  private static final int MAX_IMAGE_CACHE_ENTRIES = 16;
+  private static final Map<String, BufferedImage> IMAGE_CACHE = new LinkedHashMap<>(MAX_IMAGE_CACHE_ENTRIES, 0.75f, true) {
+    @Override
+    protected boolean removeEldestEntry(Map.Entry<String, BufferedImage> eldest) {
+      return size() > MAX_IMAGE_CACHE_ENTRIES;
+    }
+  };
 
   private final long time;
   private final double value;

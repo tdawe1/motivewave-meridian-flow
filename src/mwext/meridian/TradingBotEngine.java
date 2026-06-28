@@ -159,12 +159,7 @@ final class TradingBotEngine {
         longSig |= out.ademaLong[i];
         shortSig |= out.ademaShort[i];
       }
-      if (longSig && shortSig) {
-        longSig = false;
-        shortSig = false;
-      }
-      out.longSignal[i] = longSig;
-      out.shortSignal[i] = shortSig;
+      storeNonConflictingSignals(out.longSignal, out.shortSignal, i, longSig, shortSig);
     }
   }
 
@@ -254,7 +249,4 @@ final class TradingBotEngine {
     return min;
   }
 
-  private static double nz(double v) {
-    return Double.isNaN(v) || Double.isInfinite(v) ? 0.0 : v;
-  }
 }
